@@ -16,10 +16,20 @@ type CsvRow = {
   L1Capability?: string;
   L2Capability?: string;
   L3Capability?: string;
+  "Business Owner Sign-Off Representative"?: string;
+  "Business Owner Sign-off Acknowledgement"?: string;
+  "Technical Owner Sign-Off Representative"?: string;
+  "Technical Owner Sign-off Acknowledgement"?: string;
 };
 
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
+}
+
 const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!,
+  connectionString: databaseUrl,
 });
 
 const prisma = new PrismaClient({
@@ -37,12 +47,12 @@ async function main() {
 
   if (!fileArg) {
     console.error(
-      "Usage: node --import tsx scripts/import/import-applications.ts <path-to-csv>"
+      "Usage: node --import tsx <script-path> <path-to-csv>"
     );
     process.exit(1);
   }
 
-  const csvPath = path.resolve(fileArg);
+  const csvPath = path.resolve(process.cwd(), fileArg);
 
   if (!fs.existsSync(csvPath)) {
     console.error(`CSV file not found: ${csvPath}`);
@@ -62,6 +72,8 @@ async function main() {
   let created = 0;
   let updated = 0;
   let skipped = 0;
+  let ownershipCreated = 0;
+  let ownershipUpdated = 0;
 
   for (const row of rows) {
     const name = clean(row["Master Sheet Applications"]);
@@ -71,6 +83,8 @@ async function main() {
     const l1Capability = clean(row["L1Capability"]);
     const l2Capability = clean(row["L2Capability"]);
     const l3Capability = clean(row["L3Capability"]);
+    const businessOwner = clean(row["Business Owner Sign-Off Representative"]);
+    const technicalOwner = clean(row["Technical Owner Sign-Off Representative"]);
 
     if (!name) {
       skipped++;
@@ -78,13 +92,15 @@ async function main() {
       continue;
     }
 
+    let application;
+
     if (legacyId) {
       const existing = await prisma.application.findUnique({
         where: { legacyId },
         select: { id: true },
       });
 
-      await prisma.application.upsert({
+      application = await prisma.application.upsert({
         where: { legacyId },
         update: {
           name,
@@ -111,7 +127,7 @@ async function main() {
         created++;
       }
     } else {
-      await prisma.application.create({
+      application = await prisma.application.create({
         data: {
           name,
           businessArea,
@@ -124,6 +140,35 @@ async function main() {
 
       created++;
     }
+
+    if (businessOwner || technicalOwner) {
+      const existingOwnership = await prisma.ownership.findFirst({
+        where: { applicationId: application.id },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (existingOwnership) {
+        await prisma.ownership.update({
+          where: { id: existingOwnership.id },
+          data: {
+            businessOwner,
+            technicalOwner,
+          },
+        });
+
+        ownershipUpdated++;
+      } else {
+        await prisma.ownership.create({
+          data: {
+            applicationId: application.id,
+            businessOwner,
+            technicalOwner,
+          },
+        });
+
+        ownershipCreated++;
+      }
+    }
   }
 
   console.log("Import complete");
@@ -131,6 +176,8 @@ async function main() {
     created,
     updated,
     skipped,
+    ownershipCreated,
+    ownershipUpdated,
     totalRows: rows.length,
   });
 }
