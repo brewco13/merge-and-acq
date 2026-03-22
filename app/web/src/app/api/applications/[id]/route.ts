@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -9,11 +10,6 @@ type RouteContext = {
 
 export async function PATCH(req: Request, { params }: RouteContext) {
   try {
-
-
-	  console.log("HIT CORRECT [id] API ROUTE");
-
-
     const { id } = await params;
     const body = await req.json();
 
@@ -23,6 +19,11 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     const existingOwnership = await prisma.ownership.findFirst({
       where: { applicationId: id },
       orderBy: { createdAt: "asc" },
+    });
+
+    await prisma.application.update({
+      where: { id },
+      data: {},
     });
 
     if (
