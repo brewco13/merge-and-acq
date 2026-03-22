@@ -68,9 +68,12 @@ async function upsertDecision(params: {
 
   return prisma.dispositionDecision.create({
     data: {
+      id: crypto.randomUUID(),
       applicationId: params.applicationId,
       decisionHorizon: params.horizon,
       ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   });
 }

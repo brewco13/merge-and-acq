@@ -8,6 +8,11 @@ type RouteContext = {
   }>;
 };
 
+
+
+
+
+
 export async function GET(req: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
@@ -15,6 +20,10 @@ export async function GET(req: Request, { params }: RouteContext) {
     const application = await prisma.application.findUnique({
       where: { id },
       include: {
+        Ownership: {
+          orderBy: { createdAt: "asc" },
+          take: 1,
+        },
         Note: {
           orderBy: { createdAt: "desc" },
           take: 10,
@@ -35,6 +44,7 @@ export async function GET(req: Request, { params }: RouteContext) {
     );
   }
 }
+
 
 export async function PATCH(req: Request, { params }: RouteContext) {
   try {
@@ -66,15 +76,21 @@ export async function PATCH(req: Request, { params }: RouteContext) {
           },
         });
       } else {
-        await prisma.ownership.create({
-          data: {
-            applicationId: id,
-            businessOwner: body.businessOwner ?? null,
-            technicalOwner: body.technicalOwner ?? null,
-            businessDecisionOwner: body.businessDecisionOwner ?? null,
-            technicalDecisionOwner: body.technicalDecisionOwner ?? null,
-          },
-        });
+
+await prisma.ownership.create({
+  data: {
+    id: crypto.randomUUID(),
+    applicationId: id,
+    businessOwner: body.businessOwner ?? null,
+    technicalOwner: body.technicalOwner ?? null,
+    businessDecisionOwner: body.businessDecisionOwner ?? null,
+    technicalDecisionOwner: body.technicalDecisionOwner ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+});
+
+
       }
     }
     if (body.noteContent !== undefined) {

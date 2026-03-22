@@ -1,7 +1,6 @@
-
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function OwnershipEditPage({
@@ -12,16 +11,40 @@ export default function OwnershipEditPage({
   const router = useRouter();
   const { id } = use(params);
 
+  const [loading, setLoading] = useState(true);
+
   const [businessOwner, setBusinessOwner] = useState("");
   const [technicalOwner, setTechnicalOwner] = useState("");
   const [businessDecisionOwner, setBusinessDecisionOwner] = useState("");
   const [technicalDecisionOwner, setTechnicalDecisionOwner] = useState("");
 
+  // ✅ THIS is where useEffect goes
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(`/api/applications/${id}`);
+        const data = await res.json();
+
+        const ownership = data.Ownership?.[0] ?? null;
+
+        setBusinessOwner(ownership?.businessOwner ?? "");
+        setTechnicalOwner(ownership?.technicalOwner ?? "");
+        setBusinessDecisionOwner(ownership?.businessDecisionOwner ?? "");
+        setTechnicalDecisionOwner(ownership?.technicalDecisionOwner ?? "");
+      } catch (err) {
+        console.error("Failed to load ownership:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [id]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    console.log("bp from consol log - ownership page id:", id);
-    alert('bp from alert - ownerhip id = ${id}');
+    console.log("ownership page id:", id);
 
     const res = await fetch(`/api/applications/${id}`, {
       method: "PATCH",
@@ -44,6 +67,11 @@ export default function OwnershipEditPage({
     } else {
       alert(`Error saving ownership: ${res.status} ${text}`);
     }
+  }
+
+  // ✅ FIXED return structure
+  if (loading) {
+    return <div style={{ padding: 20 }}>Loading ownership...</div>;
   }
 
   return (

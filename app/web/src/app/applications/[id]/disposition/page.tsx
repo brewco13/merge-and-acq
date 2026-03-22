@@ -15,7 +15,7 @@ export default async function ApplicationDispositionPage({ params }: PageProps) 
   const application = await prisma.application.findUnique({
     where: { id },
     include: {
-      decisions: true,
+      DispositionDecision: true,
     },
   });
 
@@ -24,10 +24,10 @@ export default async function ApplicationDispositionPage({ params }: PageProps) 
   }
 
   const tsaDecision =
-    application.decisions.find((d) => d.decisionHorizon === "TSA_EXPIRATION") ?? null;
+    application.DispositionDecision.find((d) => d.decisionHorizon === "TSA_EXPIRATION") ?? null;
 
   const longTermDecision =
-    application.decisions.find((d) => d.decisionHorizon === "LONG_TERM") ?? null;
+    application.DispositionDecision.find((d) => d.decisionHorizon === "LONG_TERM") ?? null;
 
   return (
     <div style={{ padding: 20, maxWidth: 900 }}>
