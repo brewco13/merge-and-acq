@@ -64,29 +64,41 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   const application = await prisma.application.findUnique({
-    where: { id },
-    include: {
-      ownerships: {
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-      decisions: {
-        orderBy: [{ decisionHorizon: "asc" }, { targetDate: "asc" }],
-      },
+  where: { id },
+  include: {
+    Ownership: {
+      orderBy: { createdAt: "asc" },
+      take: 1,
     },
-  });
+    DispositionDecision: {
+      orderBy: [{ decisionHorizon: "asc" }, { targetDate: "asc" }],
+    },
+    Note: {
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    },
+  },
+});
 
   if (!application) {
     notFound();
   }
 
-  const ownership = application.ownerships[0] ?? null;
+const ownership = application.Ownership[0] ?? null;
 
-  const tsaDecision =
-    application.decisions.find((d) => d.decisionHorizon === "TSA_EXPIRATION") ?? null;
+const latestNote = application.Note[0] ?? null;
 
-  const longTermDecision =
-    application.decisions.find((d) => d.decisionHorizon === "LONG_TERM") ?? null;
+const tsaDecision =
+  application.DispositionDecision.find(
+    (d) => d.decisionHorizon === "TSA_EXPIRATION"
+  ) ?? null;
+
+const longTermDecision =
+  application.DispositionDecision.find(
+    (d) => d.decisionHorizon === "LONG_TERM"
+  ) ?? null;
+
+
 
   return (
     <div style={{ padding: 20, maxWidth: 1000 }}>
@@ -94,6 +106,7 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
         <Link href="/applications">← Back to applications</Link>
         <Link href={`/applications/${application.id}/ownership`}>Edit ownership</Link>
         <Link href={`/applications/${application.id}/disposition`}>Edit disposition</Link>
+        <Link href={`/applications/${application.id}/notes`}>Edit notes</Link>
       </div>
 
       <h1 style={{ marginBottom: 4 }}>{application.name}</h1>
@@ -181,6 +194,40 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
           <DecisionRow label="Rationale" value={longTermDecision?.rationale} />
         </tbody>
       </table>
+
+      <h2>Notes</h2>
+      <table
+        style={{
+          borderCollapse: "collapse",
+          width: "100%",
+          marginBottom: 24,
+        }}
+      >
+        <tbody>
+          <DetailRow label="Latest Note" value={latestNote?.content} />
+          <DetailRow label="Source" value={latestNote?.source} />
+          <DetailRow label="Created At" value={formatDate(latestNote?.createdAt ?? null)} />
+          <DetailRow label="Updated At" value={formatDate(latestNote?.updatedAt ?? null)} />
+        </tbody>
+      </table>
+
+{application.Note && application.Note.length > 1 && (
+  <>
+    <h3>Recent Notes</h3>
+    <ul>
+      {application.Note.slice(1).map((note) => (
+        <li key={note.id} style={{ marginBottom: 12 }}>
+          <div><strong>{note.source ?? "—"}</strong></div>
+          <div>{note.content}</div>
+          <div style={{ color: "#666", fontSize: 12 }}>
+            {formatDate(note.updatedAt)}
+          </div>
+        </li>
+      ))}
+    </ul>
+  </>
+)}
+
     </div>
   );
 }

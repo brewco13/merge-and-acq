@@ -85,6 +85,7 @@ async function main() {
     const l3Capability = clean(row["L3Capability"]);
     const businessOwner = clean(row["Business Owner Sign-Off Representative"]);
     const technicalOwner = clean(row["Technical Owner Sign-Off Representative"]);
+    const activeNotes = clean(row["CMDB Active Notes"]);
 
     if (!name) {
       skipped++;
@@ -169,6 +170,35 @@ async function main() {
         ownershipCreated++;
       }
     }
+if (activeNotes) {
+  const existingNote = await prisma.note.findFirst({
+    where: {
+      applicationId: application.id,
+      source: "CMDB_IMPORT",
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (existingNote) {
+    await prisma.note.update({
+      where: { id: existingNote.id },
+      data: {
+        content: activeNotes,
+      },
+    });
+  } else {
+    await prisma.note.create({
+      data: {
+        applicationId: application.id,
+        content: activeNotes,
+        source: "CMDB_IMPORT",
+      },
+    });
+  }
+}
+
+
+
   }
 
   console.log("Import complete");
