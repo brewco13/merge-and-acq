@@ -32,3 +32,6 @@ coverage/
 app/web/sample-data/*
 !app/web/sample-data/.keep
 !app/web/sample-data/sample-template.csv
+
+*.swp
+*.swo
