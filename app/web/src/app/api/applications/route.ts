@@ -1,64 +1,30 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
-
-export async function PATCH(req: Request, { params }: RouteContext) {
+export async function POST(req: Request) {
   try {
-
-
-	  console.log("HIT CORRECT [id] API ROUTE");
-
-
-    const { id } = await params;
     const body = await req.json();
 
-    console.log("PATCH application id:", id);
-    console.log("PATCH body:", body);
-
-    const existingOwnership = await prisma.ownership.findFirst({
-      where: { applicationId: id },
-      orderBy: { createdAt: "asc" },
+    const application = await prisma.application.create({
+      data: {
+        id: crypto.randomUUID(),
+        name: body.name,
+        legacyId: body.legacyId ?? null,
+        businessArea: body.businessArea ?? null,
+        l1Capability: body.l1Capability ?? null,
+        l2Capability: body.l2Capability ?? null,
+        l3Capability: body.l3Capability ?? null,
+        description: body.description ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
 
-    if (
-      body.businessOwner !== undefined ||
-      body.technicalOwner !== undefined ||
-      body.businessDecisionOwner !== undefined ||
-      body.technicalDecisionOwner !== undefined
-    ) {
-      if (existingOwnership) {
-        await prisma.ownership.update({
-          where: { id: existingOwnership.id },
-          data: {
-            businessOwner: body.businessOwner ?? null,
-            technicalOwner: body.technicalOwner ?? null,
-            businessDecisionOwner: body.businessDecisionOwner ?? null,
-            technicalDecisionOwner: body.technicalDecisionOwner ?? null,
-          },
-        });
-      } else {
-        await prisma.ownership.create({
-          data: {
-            applicationId: id,
-            businessOwner: body.businessOwner ?? null,
-            technicalOwner: body.technicalOwner ?? null,
-            businessDecisionOwner: body.businessDecisionOwner ?? null,
-            technicalDecisionOwner: body.technicalDecisionOwner ?? null,
-          },
-        });
-      }
-    }
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(application, { status: 201 });
   } catch (error) {
-    console.error("PATCH /api/applications/[id] failed:", error);
+    console.error("POST /api/applications failed:", error);
     return NextResponse.json(
-      { error: "Failed to update application" },
+      { error: "Failed to create application" },
       { status: 500 }
     );
   }
