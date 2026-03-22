@@ -1,4 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
 }
 
+model Application {
+  id                           String                         @id
+  legacyId                     String?                        @unique
+  name                         String
+  businessArea                 String?
+  l1Capability                 String?
+  l2Capability                 String?
+  l3Capability                 String?
+  description                  String?
+  sourceCompany                String?
+  sourceEnvironment            String?
+  currentState                 String?
+  criticality                  String?
+  lifecycleStatus              String?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime
+  DecisionCandidateApplication DecisionCandidateApplication[]
+  DispositionDecision          DispositionDecision[]
+  Note                         Note[]
+  Ownership                    Ownership[]
+
+  @@index([businessArea])
+  @@index([l1Capability, l2Capability, l3Capability])
+  @@index([name])
+}
+
+model DecisionCandidateApplication {
+  id                     String              @id
+  decisionId             String
+  candidateApplicationId String
+  priorityOrder          Int?
+  notes                  String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime
+  Application            Application         @relation(fields: [candidateApplicationId], references: [id])
+  DispositionDecision    DispositionDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@unique([decisionId, candidateApplicationId])
+  @@index([candidateApplicationId])
+  @@index([decisionId])
+}
+
+model DispositionDecision {
+  id                           String                         @id
+  applicationId                String
+  decisionHorizon              DecisionHorizon
+  targetDate                   DateTime?
+  targetDisposition            DispositionType?
+  status                       DecisionStatus                 @default(DRAFT)
+  targetPlatform               String?
+  targetTimeline               String?
+  rationale                    String?
+  decisionDate                 DateTime?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime
+  DecisionCandidateApplication DecisionCandidateApplication[]
+  Application                  Application                    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  Note                         Note[]
+
+  @@unique([applicationId, decisionHorizon, targetDate])
+  @@index([applicationId])
+  @@index([decisionHorizon])
+  @@index([status])
+}
+
+model Ownership {
+  id                     String      @id
+  applicationId          String
+  businessOwner          String?
+  technicalOwner         String?
+  businessDecisionOwner  String?
+  technicalDecisionOwner String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime
+  Application            Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+enum DecisionHorizon {
+  TSA_EXPIRATION
+  LONG_TERM
+}
+
+enum DecisionStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  IMPLEMENTED
+}
+
+enum DispositionType {
+  RETAIN
+  RETIRE
+  REPLACE
+  REHOST
+  REPLATFORM
+  REPURCHASE
+  CONSOLIDATE
+}
+
+enum NoteLevel {
+  APPLICATION
+  DECISION
+}
+
+model Note {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  content               String
+  source                String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  dispositionDecision   DispositionDecision? @relation(fields: [dispositionDecisionId], references: [id])
+  dispositionDecisionId String?
+}
