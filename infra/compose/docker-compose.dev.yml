@@ -1,20 +1,30 @@
+
 services:
-  postgres:
-    image: postgres:16
-    container_name: merge_and_acq_postgres
+  db:
+    image: postgres:16-alpine
+    container_name: merge-and-acq-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: merge_and_acq
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: mergeapp
+      POSTGRES_PASSWORD: bTt3_XeEJidg 
     volumes:
-      - merge_and_acq_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d merge_and_acq"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - merge_and_acq_db_data:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: ../../app/web
+      dockerfile: Dockerfile
+    container_name: merge-and-acq-web
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://mergeapp:bTt3_XeEJidg@db:5432/merge_and_acq?schema=public
+    ports:
+      - "3008:3000"
 
 volumes:
-  merge_and_acq_postgres_data:
+  merge_and_acq_db_data:
