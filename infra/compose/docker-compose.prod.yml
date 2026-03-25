@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: merge-and-acq-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: merge_and_acq
+      POSTGRES_USER: mergeapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - merge_and_acq_db_data:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: ../../app/web
+      dockerfile: Dockerfile
+    container_name: merge-and-acq-web
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://mergeapp:${POSTGRES_PASSWORD}@db:5432/merge_and_acq?schema=public
+    ports:
+      - "3008:3000"
+
+volumes:
+  merge_and_acq_db_data:
