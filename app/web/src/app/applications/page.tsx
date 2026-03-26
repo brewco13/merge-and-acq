@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   searchParams: Promise<{
     q?: string;
+    businessArea?: string;
+    disposition?: string;
   }>;
 };
 
@@ -14,27 +16,35 @@ export default async function ApplicationsPage({ searchParams }: PageProps) {
   const query = q?.trim() ?? "";
 
   const applications = await prisma.application.findMany({
-    where: query
-      ? {
-          OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { legacyId: { contains: query, mode: "insensitive" } },
-            { businessArea: { contains: query, mode: "insensitive" } },
-            { l1Capability: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    orderBy: { name: "asc" },
-    include: {
-      Ownership: {
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-      DispositionDecision: {
-        orderBy: [{ decisionHorizon: "asc" }, { targetDate: "asc" }],
-      },
-    },
-  });
+
+
+
+const where: any = {};
+
+if (query) {
+  where.OR = [
+    { name: { contains: query, mode: "insensitive" } },
+    { legacyId: { contains: query, mode: "insensitive" } },
+    { businessArea: { contains: query, mode: "insensitive" } },
+  ];
+}
+
+if (businessArea) {
+  where.businessArea = businessArea;
+}
+
+
+
+let filteredApps = applications;
+
+if (disposition) {
+  filteredApps = applications.filter((app) =>
+    app.DispositionDecision.some(
+      (d) => d.targetDisposition === disposition
+    )
+  );
+}
+
 
   return (
     <div style={{ padding: 20, maxWidth: 1200 }}>
@@ -56,21 +66,36 @@ export default async function ApplicationsPage({ searchParams }: PageProps) {
         <Link href="/applications/new">+ Create Application</Link>
       </div>
 
-      <form method="GET" style={{ marginBottom: 20 }}>
-        <input
-          type="text"
-          name="q"
-          defaultValue={query}
-          placeholder="Search name, legacy ID, business area, capability..."
-          style={{
-            width: "100%",
-            maxWidth: 480,
-            padding: "8px 10px",
-            border: "1px solid #ccc",
-            borderRadius: 6,
-          }}
-        />
-      </form>
+
+
+      <form method="GET" style={{ marginBottom: 20, display: "flex", gap: 10 }}>
+  <input
+    type="text"
+    name="q"
+    defaultValue={query}
+    placeholder="Search..."
+  />
+
+  <select name="businessArea" defaultValue={businessArea ?? ""}>
+    <option value="">All Business Areas</option>
+    <option value="Finance">Finance</option>
+    <option value="HR">HR</option>
+    <option value="Supply Chain">Supply Chain</option>
+  </select>
+
+  <select name="disposition" defaultValue={disposition ?? ""}>
+    <option value="">All Dispositions</option>
+    <option value="RETAIN">Retain</option>
+    <option value="RETIRE">Retire</option>
+    <option value="MIGRATE">Migrate</option>
+  </select>
+
+  <button type="submit">Apply</button>
+</form>
+
+<p style={{ marginBottom: 10 }}>
+  Showing {filteredApps.length} applications
+</p>
 
       <table
         style={{
@@ -90,7 +115,9 @@ export default async function ApplicationsPage({ searchParams }: PageProps) {
           </tr>
         </thead>
         <tbody>
-          {applications.map((app) => {
+
+
+          {filteredApps.map((app) => {
             const ownership = app.Ownership[0] ?? null;
             const tsaDecision =
               app.DispositionDecision.find(
