@@ -14,6 +14,8 @@ services:
     build:
       context: ../../app/web
       dockerfile: Dockerfile
+      args:
+        DATABASE_URL: postgresql://mergeapp:${POSTGRES_PASSWORD}@db:5432/merge_and_acq?schema=public
     container_name: merge-and-acq-web
     restart: unless-stopped
     depends_on:
