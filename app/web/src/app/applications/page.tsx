@@ -12,14 +12,11 @@ type PageProps = {
 };
 
 export default async function ApplicationsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const { q, businessArea, disposition } = await searchParams;
   const query = q?.trim() ?? "";
+  
+  const where: any = {};
 
-  const applications = await prisma.application.findMany({
-
-
-
-const where: any = {};
 
 if (query) {
   where.OR = [
@@ -33,6 +30,19 @@ if (businessArea) {
   where.businessArea = businessArea;
 }
 
+const applications = await prisma.application.findMany({
+    where,
+    orderBy: { name: "asc" },
+    include: {
+      Ownership: {
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
+      DispositionDecision: {
+        orderBy: [{ decisionHorizon: "asc" }, { targetDate: "asc" }],
+      },
+    },
+  });
 
 
 let filteredApps = applications;
@@ -150,7 +160,7 @@ if (disposition) {
             );
           })}
 
-          {applications.length === 0 && (
+	  {filteredApps.length === 0 && (
             <tr>
               <td colSpan={6} style={{ padding: "16px 8px", color: "#666" }}>
                 No applications found.
