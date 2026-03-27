@@ -24,3 +24,17 @@ Example contents:
 
 ```env
 POSTGRES_PASSWORD=replace_with_strong_password
+
+
+## Environment Variable Model
+
+### Synology compose env file
+File:
+`infra/compose/.env.prod`
+
+Purpose:
+- compose-level secret injection only
+
+Current use:
+```env
+POSTGRES_PASSWORD=replace_with_real_password

@@ -1,6 +1,6 @@
 # Merge_and_ACQ Tool – Project Status
 
-## 🎯 Objective
+## Objective
 Build a self-hosted internal application for merger application rationalization:
 - inventory applications
 - capture ownership
@@ -9,87 +9,74 @@ Build a self-hosted internal application for merger application rationalization:
 - support CSV ingestion
 - deploy to Synology for internal use
 
----
+## Current Status
+- Deployed and working on Synology
+- Live URL: `https://merge-and-acq.brewco13.com/applications`
+- Local development working on PC
+- Production deployment pattern established
+- Search and filters added to applications page
 
-## 🧱 Current Architecture
+## Current Architecture
 
 ### App
-- Next.js (App Router) + TypeScript
-- Located at: `app/web`
-- API routes under: `src/app/api/...`
+- Next.js App Router + TypeScript
+- App path: `app/web`
+- API routes: `app/web/src/app/api/...`
 
 ### Database
-- PostgreSQL (Docker)
-- Prisma ORM (v7)
-- Uses `prisma.config.ts` + `@prisma/adapter-pg`
+- PostgreSQL
+- Prisma ORM
+- Prisma config via `prisma.config.ts`
 
-### Local Runtime
-- Next dev server: `localhost:3000`
-- Docker Compose for Postgres
+### Deployment
+- Synology Docker / Container Manager
+- `infra/compose/docker-compose.prod.yml`
+- Reverse proxy in DSM
+- TLS certificate configured for app hostname
 
----
-
-## 📦 Data Model (Active)
-
-- Application
-- Ownership
-- DispositionDecision
-- Note
-
-### Important (Post `db pull`)
-Prisma introspection changed relation field names:
-
-| Old | New |
-|-----|-----|
-| ownerships | Ownership |
-| decisions | DispositionDecision |
-| notes | Note |
-
-Also, some models now require explicit values on create:
-- `id`
-- `createdAt`
-- `updatedAt`
-
----
-
-## ✅ Verified Working Features
-
-### Core
+## Verified Working Features
 - Application list page
 - Application detail page
 - Create application
-- CSV import (applications + ownership + notes)
+- Ownership edit/save
+- Disposition edit/save
+- Notes edit/save
+- CSV import
+- Search on applications page
+- Filters on applications page:
+  - Business Area
+  - TSA disposition
 
-### Ownership
-- Edit ownership page
-- Save via PATCH
-- Preload existing values
+## Important Technical Notes
 
-### Disposition
-- Edit disposition page
-- Upsert TSA + Long-term decisions
-- Save via POST route
+### Prisma Introspection
+After `prisma db pull`, relation names changed and code had to align:
+- `Ownership`
+- `DispositionDecision`
+- `Note`
 
-### Notes (v1)
-- Import from CSV (`CMDB Active Notes`)
-- Display on detail page
-- Edit via dedicated page
-- Separate sources:
-  - `CMDB_IMPORT`
-  - `USER_EDIT`
+### Build/Deploy Lessons
+- Build-time Prisma generation required `DATABASE_URL` via Docker build args
+- `.dockerignore` materially reduced Synology build context and build time
+- `.env.prod` is for compose-level secrets only
+- App runtime environment is passed through Docker Compose
+- Do not commit `.env.prod`
 
----
+### Environment Separation
+- PC = development / testing
+- GitHub = source of truth
+- Synology = production runtime
 
-## ⚠️ Known Technical Quirks
+## Deployment Notes
+See `docs/deployment-synology.md` for:
+- compose commands
+- migration commands
+- reverse proxy config
+- update workflow
 
-### Prisma Introspection Impact
-- Relation names are capitalized (e.g., `Application.Note`)
-- Must use exact field names in queries and UI
-- Some models lost default values → require manual fields in `create()`
-
-### Required Fields on Create
-Currently needed in some routes:
-```ts
-id: crypto.randomUUID()
-createdAt: new Date()
-updatedAt: new Date()
+## Deferred / Planned
+- Tailscale-only access hardening
+- Full notes history / timeline
+- Dynamic filter values sourced from DB
+- Dashboard / summary counts
+- Additional UX improvements
