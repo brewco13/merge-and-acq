@@ -50,7 +50,7 @@ function CountTable({
         border: "1px solid #dbe3ee",
         borderRadius: 12,
         padding: 18,
-        boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+        boxShadow: "0 1px 2px rgba(16,24,40,0.04)"
       }}
       <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 20 }}>
         {title}
