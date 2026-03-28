@@ -6,7 +6,9 @@ services:
     environment:
       POSTGRES_DB: merge_and_acq
       POSTGRES_USER: mergeapp
-      POSTGRES_PASSWORD: bTt3_XeEJidg 
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} 
+    ports:
+      - "5432:5432"
     volumes:
       - merge_and_acq_db_data:/var/lib/postgresql/data
 
@@ -21,7 +23,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://mergeapp:bTt3_XeEJidg@db:5432/merge_and_acq?schema=public
+      DATABASE_URL: postgresql://mergeapp:${POSTGRES_PASSWORD}@db:5432/merge_and_acq?schema=public
     ports:
       - "3008:3000"
 
