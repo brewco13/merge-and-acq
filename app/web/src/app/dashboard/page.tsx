@@ -5,6 +5,7 @@ import PageShell from "@/components/page-shell";
 
 type CountRow = {
   label: string;
+  count: number;
 };
 
 type DashboardSummary = {
@@ -24,6 +25,7 @@ function Card({ title, value }: { title: string; value: number }) {
       style={{
         background: "white",
         border: "1px solid #dbe3ee",
+        borderRadius: 12,
         padding: 18,
         boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
       }}
@@ -47,11 +49,13 @@ function CountTable({
   return (
     <div
       style={{
+        background: "white",
         border: "1px solid #dbe3ee",
         borderRadius: 12,
         padding: 18,
-        boxShadow: "0 1px 2px rgba(16,24,40,0.04)"
+        boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
       }}
+    >
       <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 20 }}>
         {title}
       </h2>
@@ -92,21 +96,14 @@ export default function DashboardPage() {
             <Card title="Total Applications" value={data.totalApplications} />
             <Card title="With Ownership" value={data.withOwnership} />
             <Card title="With Notes" value={data.withNotes} />
+            <Card title="TSA Decisions" value={data.tsaDecisions} />
+            <Card title="Long-Term Decisions" value={data.longTermDecisions} />
           </div>
 
           <div style={{ display: "flex", gap: 16 }}>
-            <CountTable
-              title="Business Area"
-              rows={data.businessArea}
-            />
-            <CountTable
-              title="TSA Disposition"
-              rows={data.tsaDisposition}
-            />
-            <CountTable
-              title="Long Term"
-              rows={data.longTermDisposition}
-            />
+            <CountTable title="Business Area" rows={data.businessArea} />
+            <CountTable title="TSA Disposition" rows={data.tsaDisposition} />
+            <CountTable title="Long Term" rows={data.longTermDisposition} />
           </div>
         </>
       )}
