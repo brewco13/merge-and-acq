@@ -1,4 +1,5 @@
 "use client";
+import PageShell from "@/components/page-shell";
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -76,6 +77,7 @@ export default function NotesEditPage({
   }
 
   return (
+  <PageShell>
     <div style={{ padding: 20, maxWidth: 800 }}>
       <h1>Edit Notes</h1>
 
@@ -103,5 +105,6 @@ export default function NotesEditPage({
         </div>
       </form>
     </div>
+  </PageShell>
   );
 }

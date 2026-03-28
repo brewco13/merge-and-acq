@@ -1,3 +1,4 @@
+import PageShell from "@/components/page-shell";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -31,6 +32,7 @@ export default async function ApplicationDispositionPage({ params }: PageProps) 
     application.DispositionDecision.find((d) => d.decisionHorizon === "LONG_TERM") ?? null;
 
   return (
+   <PageShell>
     <div style={{ padding: 20, maxWidth: 900 }}>
       <div style={{ marginBottom: 16, display: "flex", gap: 16 }}>
         <Link href={`/applications/${application.id}`}>← Back to application</Link>
@@ -66,5 +68,6 @@ export default async function ApplicationDispositionPage({ params }: PageProps) 
         }}
       />
     </div>
+   </PageShell>
   );
 }

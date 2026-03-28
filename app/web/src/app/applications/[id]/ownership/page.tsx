@@ -1,4 +1,5 @@
 "use client";
+import PageShell from "@/components/page-shell";
 
 import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -75,6 +76,7 @@ export default function OwnershipEditPage({
   }
 
   return (
+  <PageShell>
     <div style={{ padding: 20 }}>
       <h1>Edit Ownership</h1>
 
@@ -115,5 +117,6 @@ export default function OwnershipEditPage({
         <button type="submit">Save</button>
       </form>
     </div>
+  </PageShell>
   );
 }
