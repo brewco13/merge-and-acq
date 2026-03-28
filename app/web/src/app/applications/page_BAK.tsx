@@ -1,3 +1,107 @@
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import PageShell from "@/components/page-shell";
+
+export default async function ApplicationsPage() {
+  const applications = await prisma.application.findMany({
+    orderBy: { name: "asc" },
+  });
+
+  return (
+    <PageShell>
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #dbe3ee",
+          borderRadius: 12,
+          padding: 20,
+          boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <h1 style={{ margin: 0, fontSize: 28 }}>Applications</h1>
+            <p style={{ margin: "6px 0 0 0", color: "#667085" }}>
+              Browse and manage the merger application inventory.
+            </p>
+          </div>
+
+          <Link
+            href="/applications/new"
+            style={{
+              textDecoration: "none",
+              background: "#254f7a",
+              color: "white",
+              padding: "10px 14px",
+              borderRadius: 8,
+              fontWeight: 600,
+            }}
+          >
+            + New Application
+          </Link>
+        </div>
+
+        <table
+          style={{
+            borderCollapse: "collapse",
+            width: "100%",
+            fontSize: 14,
+            background: "white",
+          }}
+        >
+          <thead>
+            <tr
+              style={{
+                borderBottom: "2px solid #dbe3ee",
+                textAlign: "left",
+                background: "#f8fafc",
+              }}
+            >
+              <th style={{ padding: "10px 12px" }}>Name</th>
+              <th style={{ padding: "10px 12px" }}>Legacy ID</th>
+              <th style={{ padding: "10px 12px" }}>Business Area</th>
+              <th style={{ padding: "10px 12px" }}>L1 Capability</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {applications.map((app) => (
+              <tr
+                key={app.id}
+                style={{
+                  borderBottom: "1px solid #eef2f6",
+                }}
+              >
+                <td style={{ padding: "10px 12px" }}>
+                  <Link href={`/applications/${app.id}`}>{app.name}</Link>
+                </td>
+                <td style={{ padding: "10px 12px" }}>{app.legacyId ?? ""}</td>
+                <td style={{ padding: "10px 12px" }}>
+                  {app.businessArea ?? ""}
+                </td>
+                <td style={{ padding: "10px 12px" }}>
+                  {app.l1Capability ?? ""}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </PageShell>
+  );
+}
+
+
+
+
+
 import PageShell from "@/components/page-shell";
 
 import Link from "next/link";
