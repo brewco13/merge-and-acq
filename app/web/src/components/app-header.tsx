@@ -63,6 +63,20 @@ export default function AppHeader() {
             Applications
           </Link>
 
+  <Link
+    href="/dashboard"
+    style={{
+      color: "white",
+      textDecoration: "none",
+      fontSize: 14,
+      fontWeight: 500,
+    }}
+  >
+    Dashboard
+  </Link>
+
+
+
           <span style={badgeStyle("rgba(255,255,255,0.18)")}>
             {APP_INFO.version}
           </span>
