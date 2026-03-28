@@ -26,6 +26,7 @@ function Card({ title, value }: { title: string; value: number }) {
         border: "1px solid #dbe3ee",
         padding: 18,
         boxShadow: "0 1px 2px rgba(16,24,40,0.04)",
+      }}
     >
       <div style={{ fontSize: 13, color: "#667085", marginBottom: 8 }}>
       </div>
