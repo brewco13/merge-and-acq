@@ -13,19 +13,28 @@ The tool is designed to move merger analysis out of spreadsheets and into a stru
 
 ---
 
-## Current Status
+## Current State (March 2026)
 
-Current working baseline includes:
+- Application is deployed to Synology
+- Production URL: https://merge-and-acq.brewco13.com
+- Dashboard implemented
+- Client-side dashboard data fetching via API
+- PostgreSQL + Prisma backend
+- Docker-based deployment--
 
-- application list page
-- application detail page
-- create application form
-- CSV import for core application records
-- ownership display and edit flow
-- local Docker + PostgreSQL development environment
-- Prisma schema, migrations, and runtime client
+## Local Development
 
-This project is currently in active MVP build-out.
+cd app/web
+npm run dev
+
+App runs at:
+http://localhost:3000--
+
+## Production Deployment (Synology)
+
+git pull
+
+docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
 
 ---
 
@@ -71,6 +80,18 @@ Current ownership fields:
 - `technicalOwner`
 - `businessDecisionOwner`
 - `technicalDecisionOwner`
+
+## Architecture
+
+- UI: Next.js (App Router)
+- API: Next.js route handlers
+- Data Layer: Prisma + PostgreSQL
+- Dashboard:
+  - UI: client-side fetch
+  - API: /api/dashboard/summary
+  - Queries: src/lib/dashboard/queries.ts
+
+---
 
 ### Planned / Designed Entities
 The following entities are already designed and partially modeled, but not yet fully implemented in UI:
