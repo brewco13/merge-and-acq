@@ -55,6 +55,11 @@ model DispositionDecision {
   targetDate                   DateTime?
   targetDisposition            DispositionType?
   status                       DecisionStatus                 @default(DRAFT)
+  businessReviewStatus         ReviewStatus? @default(NOT_STARTED)
+  businessSignoffStatus        ReviewStatus? @default(NOT_STARTED)
+  technicalReviewStatus        ReviewStatus? @default(NOT_STARTED)
+  technicalSignoffStatus       ReviewStatus? @default(NOT_STARTED)
+  reviewedAt                   DateTime?
   targetPlatform               String?
   targetTimeline               String?
   rationale                    String?
@@ -64,7 +69,6 @@ model DispositionDecision {
   DecisionCandidateApplication DecisionCandidateApplication[]
   Application                  Application                    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   Note                         Note[]
-
   @@unique([applicationId, decisionHorizon, targetDate])
   @@index([applicationId])
   @@index([decisionHorizon])
@@ -110,6 +114,13 @@ enum DispositionType {
 enum NoteLevel {
   APPLICATION
   DECISION
+}
+
+enum ReviewStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  REVIEWED
+  SIGNED_OFF
 }
 
 model Note {
