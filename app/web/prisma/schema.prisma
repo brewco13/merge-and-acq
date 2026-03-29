@@ -26,10 +26,61 @@ model Application {
   DispositionDecision          DispositionDecision[]
   Note                         Note[]
   Ownership                    Ownership[]
+  ConfidenceAssessment         ConfidenceAssessment[]
 
   @@index([businessArea])
   @@index([l1Capability, l2Capability, l3Capability])
   @@index([name])
+}
+
+model ConfidenceAssessment {
+  id                  String                     @id @default(cuid())
+  applicationId       String
+  horizonType         ConfidenceHorizon
+  calculatedScore     Int
+  manualAdjustment    Int                        @default(0)
+  finalScore          Int
+  confidenceBand      ConfidenceBand
+  scoringModelVersion String
+  assessmentStatus    ConfidenceAssessmentStatus @default(SYSTEM_CALCULATED)
+
+  reviewerName   String?
+  reviewNotes    String?
+  overrideReason String?
+
+  isStale      Boolean   @default(false)
+  calculatedAt DateTime
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Application           Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  ConfidenceFactorScore ConfidenceFactorScore[]
+
+  @@unique([applicationId, horizonType])
+  @@index([applicationId])
+  @@index([horizonType, finalScore])
+  @@index([confidenceBand])
+}
+
+model ConfidenceFactorScore {
+  id                     String               @id @default(cuid())
+  confidenceAssessmentId String
+  factorCode             ConfidenceFactorCode
+  rawScore               Int
+  weightPercent          Decimal              @db.Decimal(5, 2)
+  weightedScore          Decimal              @db.Decimal(6, 2)
+  maxScore               Int                  @default(100)
+  explanation            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ConfidenceAssessment ConfidenceAssessment @relation(fields: [confidenceAssessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([confidenceAssessmentId, factorCode])
+  @@index([factorCode])
 }
 
 model DecisionCandidateApplication {
@@ -55,10 +106,10 @@ model DispositionDecision {
   targetDate                   DateTime?
   targetDisposition            DispositionType?
   status                       DecisionStatus                 @default(DRAFT)
-  businessReviewStatus         ReviewStatus? @default(NOT_STARTED)
-  businessSignoffStatus        ReviewStatus? @default(NOT_STARTED)
-  technicalReviewStatus        ReviewStatus? @default(NOT_STARTED)
-  technicalSignoffStatus       ReviewStatus? @default(NOT_STARTED)
+  businessReviewStatus         ReviewStatus?                  @default(NOT_STARTED)
+  businessSignoffStatus        ReviewStatus?                  @default(NOT_STARTED)
+  technicalReviewStatus        ReviewStatus?                  @default(NOT_STARTED)
+  technicalSignoffStatus       ReviewStatus?                  @default(NOT_STARTED)
   reviewedAt                   DateTime?
   targetPlatform               String?
   targetTimeline               String?
@@ -69,6 +120,7 @@ model DispositionDecision {
   DecisionCandidateApplication DecisionCandidateApplication[]
   Application                  Application                    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   Note                         Note[]
+
   @@unique([applicationId, decisionHorizon, targetDate])
   @@index([applicationId])
   @@index([decisionHorizon])
@@ -121,6 +173,33 @@ enum ReviewStatus {
   IN_PROGRESS
   REVIEWED
   SIGNED_OFF
+}
+
+enum ConfidenceHorizon {
+  TSA
+  LONG_TERM
+}
+
+enum ConfidenceBand {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ConfidenceAssessmentStatus {
+  SYSTEM_CALCULATED
+  REVIEWED
+  APPROVED
+  OVERRIDDEN
+}
+
+enum ConfidenceFactorCode {
+  DISPOSITION_DEFINITION
+  EVIDENCE_QUALITY
+  BUSINESS_ALIGNMENT
+  TECHNICAL_ALIGNMENT
+  EXECUTION_READINESS
+  STABILITY_CONSISTENCY
 }
 
 model Note {
