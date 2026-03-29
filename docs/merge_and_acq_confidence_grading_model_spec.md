@@ -1788,165 +1788,1944 @@ This section converts the build plan into an execution checklist that can be wor
 ## 27.1 Schema migration checklist
 
 ### Supporting field readiness
-
--
+- Confirm existing fields on Application, Ownership, DispositionDecision, Note
+- Map fields to scoring rules (TSA and Long-term)
+- Identify gaps requiring new fields
 
 ### Supporting field additions
-
--
+- Add review/sign-off fields:
+  - businessReviewStatus, businessSignoffStatus
+  - technicalReviewStatus, technicalSignoffStatus
+- Validate targetDate, targetPlatform, status fields for both horizons
 
 ### New confidence entities
-
--
+- Add ConfidenceAssessment
+- Add ConfidenceFactorScore
+- Add enums: ConfidenceHorizon, ConfidenceBand, ConfidenceAssessmentStatus, ConfidenceFactorCode, ReviewStatus
+- Add indexes and unique constraints
 
 ### Migration execution
-
--
+- Generate Prisma migration
+- Run locally and validate schema
+- Regenerate Prisma client
 
 ### Backfill readiness
-
--
+- Build batch recalc script
+- Validate sample applications after backfill
 
 ---
 
 ## 27.2 API checklist
 
 ### Confidence module foundations
-
--
+- Create confidence-types, rules, utils, scoring, engine, repository modules
 
 ### Rules and constants
-
--
+- Define weights, bands, model version, adjustment bounds
 
 ### Utility helpers
-
--
+- clampScore, roundScore, deriveConfidenceBand, isAssessmentStale
 
 ### Factor scoring functions
-
--
+- Implement all six factor scorers with tests
 
 ### Confidence engine
-
--
+- Implement calculateOnly and calculateAndPersist
 
 ### Read endpoint
-
--
+- GET /api/applications/:id/confidence
 
 ### Recalculate endpoint
-
--
+- POST /api/applications/:id/confidence/recalculate
 
 ### Manual review / adjustment endpoint
-
--
+- PATCH /api/applications/:id/confidence/:horizon
 
 ### Automatic recalculation hooks
-
--
+- Trigger on disposition, ownership, notes, review changes
 
 ### Batch/admin utilities
-
--
+- Script to recalc all applications
 
 ---
 
 ## 27.3 UI component checklist
 
 ### Application detail page
-
--
+- Confidence summary (TSA + Long-term)
+- Status, stale flag, timestamps
 
 ### Factor breakdown
-
--
+- Show factor scores and explanations
 
 ### Recalculate interaction
-
--
+- Button + loading/feedback state
 
 ### Manual review / adjustment UI
-
--
+- Form with validation and reason requirement
 
 ### Application list page
-
--
+- TSA and Long-term score chips/columns
 
 ### Sorting and filtering
-
--
+- Bands, ranges, stale, overridden
 
 ### Dashboard components
-
--
+- Summary tiles and queues
 
 ### UI polish and usability
-
--
+- Tooltips, empty states, error states
 
 ---
 
 ## 27.4 Testing checklist
 
 ### Unit tests – utilities and scoring
-
--
+- Cover each factor and edge cases
 
 ### Service / engine tests
-
--
+- End-to-end calculation per horizon
 
 ### API tests
-
--
+- Read, recalc, adjustment, validation errors
 
 ### UI tests
-
--
+- Detail panel, recalc, adjustment flows
 
 ### Backfill and regression validation
-
--
+- Validate portfolio after migration
 
 ---
 
 ## 27.5 Suggested developer execution order
 
 ### First pass
-
--
+- Schema + enums + basic engine skeleton
 
 ### Second pass
-
--
+- Factor scoring + endpoints
 
 ### Third pass
-
--
+- Detail UI + list visibility
 
 ### Fourth pass
+- Adjustments + dashboard + hardening
 
--
+---
+
+## 28. Prisma Schema Draft
+
+This section provides a developer-oriented Prisma schema draft for the v1 Confidence Grading feature. It is written to be practical for adaptation into the current Merge_and_ACQ data model.
+
+---
+
+## 28.1 Drafting assumptions
+
+This draft assumes:
+- `Application` already exists and is the parent record for disposition work
+- at least one existing model currently holds disposition-related data
+- `Ownership` and `Note` already exist or equivalent structures are in place
+- v1 will use explicit review/sign-off status fields rather than a separate approval workflow entity
+
+Where current model names or field names differ, this draft should be adapted rather than copied blindly.
+
+---
+
+## 28.2 Recommended enums
+
+```prisma
+enum ConfidenceHorizon {
+  TSA
+  LONG_TERM
+}
+
+enum ConfidenceBand {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ConfidenceAssessmentStatus {
+  SYSTEM_CALCULATED
+  REVIEWED
+  APPROVED
+  OVERRIDDEN
+}
+
+enum ConfidenceFactorCode {
+  DISPOSITION_DEFINITION
+  EVIDENCE_QUALITY
+  BUSINESS_ALIGNMENT
+  TECHNICAL_ALIGNMENT
+  EXECUTION_READINESS
+  STABILITY_CONSISTENCY
+}
+
+enum ReviewStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  REVIEWED
+  SIGNED_OFF
+}
+```
+
+### Notes
+- `ReviewStatus` is intended as a pragmatic v1 enum for business/technical review fields.
+- If the current schema already has a generic workflow status enum that cleanly fits this use, that may be reused instead.
+
+---
+
+## 28.3 Confidence entities
+
+### ConfidenceAssessment
+
+```prisma
+model ConfidenceAssessment {
+  id                  String                       @id @default(cuid())
+  applicationId       String
+  application         Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  horizonType         ConfidenceHorizon
+  calculatedScore     Int
+  manualAdjustment    Int                          @default(0)
+  finalScore          Int
+  confidenceBand      ConfidenceBand
+  scoringModelVersion String
+  assessmentStatus    ConfidenceAssessmentStatus   @default(SYSTEM_CALCULATED)
+
+  reviewerName        String?
+  reviewNotes         String?
+  overrideReason      String?
+
+  isStale             Boolean                      @default(false)
+  calculatedAt        DateTime
+  reviewedAt          DateTime?
+
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  factorScores        ConfidenceFactorScore[]
+
+  @@unique([applicationId, horizonType])
+  @@index([horizonType, finalScore])
+  @@index([confidenceBand])
+  @@index([applicationId])
+}
+```
+
+### ConfidenceFactorScore
+
+```prisma
+model ConfidenceFactorScore {
+  id                     String                  @id @default(cuid())
+  confidenceAssessmentId String
+  confidenceAssessment   ConfidenceAssessment    @relation(fields: [confidenceAssessmentId], references: [id], onDelete: Cascade)
+
+  factorCode             ConfidenceFactorCode
+  rawScore               Int
+  weightPercent          Decimal                 @db.Decimal(5,2)
+  weightedScore          Decimal                 @db.Decimal(6,2)
+  maxScore               Int                     @default(100)
+  explanation            String?
+
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  @@unique([confidenceAssessmentId, factorCode])
+  @@index([factorCode])
+}
+```
+
+### Design notes
+- `manualAdjustment` remains separate from `calculatedScore` so recalculation does not destroy analyst input.
+- `finalScore` is persisted for fast reads and filtering.
+- `reviewerName` is acceptable in v1 if there is not yet a user identity model in scope.
+- `isStale` is denormalized on purpose to make list filtering and dashboard aggregation easier.
+
+---
+
+## 28.4 Application relation addition
+
+Assuming `Application` is your parent entity, add a reverse relation like this:
+
+```prisma
+model Application {
+  id                    String                  @id @default(cuid())
+  // ...existing fields...
+
+  confidenceAssessments ConfidenceAssessment[]
+}
+```
+
+If the actual primary key type on `Application` is not `String`, adjust the foreign key type on `ConfidenceAssessment.applicationId` accordingly.
+
+---
+
+## 28.5 Supporting field draft for disposition and review data
+
+The exact placement of these fields depends on your current schema. In many cases they belong on an existing `DispositionDecision` model.
+
+### Recommended pattern if `DispositionDecision` already exists
+
+```prisma
+model DispositionDecision {
+  id                         String        @id @default(cuid())
+  applicationId              String
+  application                Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  decisionHorizon            ConfidenceHorizon
+  targetDisposition          String?
+  rationale                  String?
+  targetDate                 DateTime?
+  targetPlatform            String?
+  status                     String?
+
+  businessReviewStatus       ReviewStatus? @default(NOT_STARTED)
+  businessSignoffStatus      ReviewStatus? @default(NOT_STARTED)
+  technicalReviewStatus      ReviewStatus? @default(NOT_STARTED)
+  technicalSignoffStatus     ReviewStatus? @default(NOT_STARTED)
+
+  reviewedAt                 DateTime?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+
+  @@index([applicationId])
+  @@index([decisionHorizon])
+}
+```
+
+### Notes
+- If you already store TSA and Long-term decisions as separate rows, `decisionHorizon` fits well.
+- If you already store both horizons as separate field groups on one row, keep that structure and adapt the confidence engine to map accordingly.
+- `status` is shown as `String?` only because your current enum may already exist. If not, introducing a proper disposition workflow enum would be cleaner.
+
+---
+
+## 28.6 Alternative supporting field draft if disposition data is stored directly on Application
+
+If the current app stores disposition fields directly on `Application`, this is a practical transitional pattern:
+
+```prisma
+model Application {
+  id                          String        @id @default(cuid())
+  // ...existing fields...
+
+  tsaDisposition              String?
+  tsaRationale                String?
+  tsaTargetDate               DateTime?
+  tsaTargetPlatform           String?
+  tsaStatus                   String?
+
+  longTermDisposition         String?
+  longTermRationale           String?
+  longTermTargetDate          DateTime?
+  longTermTargetPlatform      String?
+  longTermStatus              String?
+
+  businessReviewStatus        ReviewStatus? @default(NOT_STARTED)
+  businessSignoffStatus       ReviewStatus? @default(NOT_STARTED)
+  technicalReviewStatus       ReviewStatus? @default(NOT_STARTED)
+  technicalSignoffStatus      ReviewStatus? @default(NOT_STARTED)
+
+  confidenceAssessments       ConfidenceAssessment[]
+}
+```
+
+### Recommendation
+Prefer keeping disposition data in `DispositionDecision` if that entity already exists and is stable. It is usually cleaner than flattening more horizon-specific fields onto `Application`.
+
+---
+
+## 28.7 Ownership-related schema fit
+
+If `Ownership` already exists, confirm it exposes the fields the scoring engine needs. A typical pattern would be:
+
+```prisma
+model Ownership {
+  id                     String       @id @default(cuid())
+  applicationId          String       @unique
+  application            Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  businessOwner          String?
+  technicalOwner         String?
+  businessDecisionOwner  String?
+  technicalDecisionOwner String?
+
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+}
+```
+
+### Notes
+- If `Ownership` is one-to-many instead of one-to-one, that is still workable, but the confidence engine will need a clear rule for which row is authoritative.
+- For v1, the cleanest scoring implementation is usually one active ownership record per application.
+
+---
+
+## 28.8 Note-related schema fit
+
+If notes are already modeled, confirm the engine can determine at least:
+- whether any initial analysis note exists
+- whether any substantive note exists
+- whether notes were updated recently enough to support review freshness logic
+
+A typical minimal note shape might look like:
+
+```prisma
+model Note {
+  id             String       @id @default(cuid())
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  title          String?
+  content        String
+  noteType       String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+```
+
+### Recommendation
+If `noteType` does not exist today, the feature can still ship. The scoring engine can initially infer “initial analysis” and “meaningful note” using simple heuristics.
+
+---
+
+## 28.9 Combined schema example
+
+This is a consolidated example showing how the confidence-related additions fit together conceptually.
+
+```prisma
+enum ConfidenceHorizon {
+  TSA
+  LONG_TERM
+}
+
+enum ConfidenceBand {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ConfidenceAssessmentStatus {
+  SYSTEM_CALCULATED
+  REVIEWED
+  APPROVED
+  OVERRIDDEN
+}
+
+enum ConfidenceFactorCode {
+  DISPOSITION_DEFINITION
+  EVIDENCE_QUALITY
+  BUSINESS_ALIGNMENT
+  TECHNICAL_ALIGNMENT
+  EXECUTION_READINESS
+  STABILITY_CONSISTENCY
+}
+
+enum ReviewStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  REVIEWED
+  SIGNED_OFF
+}
+
+model Application {
+  id                    String                  @id @default(cuid())
+  // ...existing fields...
+
+  ownership             Ownership?
+  dispositionDecisions  DispositionDecision[]
+  notes                 Note[]
+  confidenceAssessments ConfidenceAssessment[]
+}
+
+model Ownership {
+  id                     String       @id @default(cuid())
+  applicationId          String       @unique
+  application            Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  businessOwner          String?
+  technicalOwner         String?
+  businessDecisionOwner  String?
+  technicalDecisionOwner String?
+
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+}
+
+model DispositionDecision {
+  id                     String             @id @default(cuid())
+  applicationId          String
+  application            Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  decisionHorizon        ConfidenceHorizon
+  targetDisposition      String?
+  rationale              String?
+  targetDate             DateTime?
+  targetPlatform         String?
+  status                 String?
+
+  businessReviewStatus   ReviewStatus?      @default(NOT_STARTED)
+  businessSignoffStatus  ReviewStatus?      @default(NOT_STARTED)
+  technicalReviewStatus  ReviewStatus?      @default(NOT_STARTED)
+  technicalSignoffStatus ReviewStatus?      @default(NOT_STARTED)
+
+  reviewedAt             DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  @@index([applicationId])
+  @@index([decisionHorizon])
+}
+
+model Note {
+  id             String       @id @default(cuid())
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  title          String?
+  content        String
+  noteType       String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([applicationId])
+}
+
+model ConfidenceAssessment {
+  id                  String                       @id @default(cuid())
+  applicationId       String
+  application         Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  horizonType         ConfidenceHorizon
+  calculatedScore     Int
+  manualAdjustment    Int                          @default(0)
+  finalScore          Int
+  confidenceBand      ConfidenceBand
+  scoringModelVersion String
+  assessmentStatus    ConfidenceAssessmentStatus   @default(SYSTEM_CALCULATED)
+
+  reviewerName        String?
+  reviewNotes         String?
+  overrideReason      String?
+
+  isStale             Boolean                      @default(false)
+  calculatedAt        DateTime
+  reviewedAt          DateTime?
+
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  factorScores        ConfidenceFactorScore[]
+
+  @@unique([applicationId, horizonType])
+  @@index([applicationId])
+  @@index([horizonType, finalScore])
+  @@index([confidenceBand])
+}
+
+model ConfidenceFactorScore {
+  id                     String                  @id @default(cuid())
+  confidenceAssessmentId String
+  confidenceAssessment   ConfidenceAssessment    @relation(fields: [confidenceAssessmentId], references: [id], onDelete: Cascade)
+
+  factorCode             ConfidenceFactorCode
+  rawScore               Int
+  weightPercent          Decimal                 @db.Decimal(5,2)
+  weightedScore          Decimal                 @db.Decimal(6,2)
+  maxScore               Int                     @default(100)
+  explanation            String?
+
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  @@unique([confidenceAssessmentId, factorCode])
+  @@index([factorCode])
+}
+```
+
+---
+
+## 28.10 Migration guidance
+
+### Recommended migration sequence
+1. Add enums and supporting review/sign-off fields
+2. Add `ConfidenceAssessment` and `ConfidenceFactorScore`
+3. Regenerate Prisma client
+4. Run migration in development
+5. Create and run batch backfill script for existing applications
+
+### Suggested migration naming
+- `add_confidence_review_status_fields`
+- `add_confidence_assessment_models`
+
+### Backfill note
+Do not rely on score computation only at read time for existing records. Populate current assessments for all applications after migration so list and dashboard reads are fast and consistent.
+
+---
+
+## 28.11 Open schema decisions to confirm in the codebase
+
+Before finalizing the migration, confirm these against the current repo:
+- Is `Application.id` a `String @id @default(cuid())` or something else?
+- Is `Ownership` one-to-one or one-to-many?
+- Is `DispositionDecision` already horizon-based or field-based?
+- Does an enum already exist for disposition workflow status?
+- Should `reviewerName` stay as free text, or should it point to a user identity later?
+- Are notes already typed, or will v1 infer note meaning heuristically?
+
+These do not block the design, but they do affect the exact migration draft you will commit.
+
+---
+
+## 29. TypeScript Confidence Engine Skeleton
+
+This section provides a developer-ready TypeScript skeleton for the confidence engine layer. It is intentionally scaffold-oriented rather than fully implemented, so it can be adapted cleanly to the current Merge_and_ACQ codebase.
+
+---
+
+## 29.1 Suggested file layout
+
+```text
+src/
+  lib/
+    confidence/
+      confidence-types.ts
+      confidence-rules.ts
+      confidence-utils.ts
+      confidence-engine.ts
+      confidence-scoring.ts
+      confidence-repository.ts
+```
+
+### Recommended responsibility split
+- `confidence-types.ts` → shared types and interfaces
+- `confidence-rules.ts` → weights, thresholds, model version, rule constants
+- `confidence-utils.ts` → helpers for clamping, rounding, stale logic, applicability logic
+- `confidence-scoring.ts` → pure factor scoring functions
+- `confidence-repository.ts` → Prisma reads and upserts for confidence records
+- `confidence-engine.ts` → orchestration service used by routes and batch jobs
+
+---
+
+## 29.2 `confidence-types.ts`
+
+```ts
+export type ConfidenceHorizon = 'TSA' | 'LONG_TERM';
+
+export type ConfidenceBand = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export type ConfidenceAssessmentStatus =
+  | 'SYSTEM_CALCULATED'
+  | 'REVIEWED'
+  | 'APPROVED'
+  | 'OVERRIDDEN';
+
+export type ConfidenceFactorCode =
+  | 'DISPOSITION_DEFINITION'
+  | 'EVIDENCE_QUALITY'
+  | 'BUSINESS_ALIGNMENT'
+  | 'TECHNICAL_ALIGNMENT'
+  | 'EXECUTION_READINESS'
+  | 'STABILITY_CONSISTENCY';
+
+export type ReviewStatus =
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'REVIEWED'
+  | 'SIGNED_OFF';
+
+export interface ConfidenceFactorResult {
+  factorCode: ConfidenceFactorCode;
+  rawScore: number;
+  weightPercent: number;
+  weightedScore: number;
+  maxScore: number;
+  explanation: string;
+  helpingSignals?: string[];
+  loweringSignals?: string[];
+}
+
+export interface HorizonConfidenceResult {
+  horizonType: ConfidenceHorizon;
+  calculatedScore: number;
+  manualAdjustment: number;
+  finalScore: number;
+  confidenceBand: ConfidenceBand;
+  assessmentStatus: ConfidenceAssessmentStatus;
+  scoringModelVersion: string;
+  isStale: boolean;
+  calculatedAt: Date;
+  reviewedAt: Date | null;
+  reviewerName: string | null;
+  reviewNotes: string | null;
+  overrideReason: string | null;
+  factorScores: ConfidenceFactorResult[];
+}
+
+export interface ApplicationConfidenceResponse {
+  applicationId: string;
+  tsa: HorizonConfidenceResult;
+  longTerm: HorizonConfidenceResult;
+}
+
+export interface ConfidenceEngineInput {
+  applicationId: string;
+}
+
+export interface ConfidenceContext {
+  application: {
+    id: string;
+    name?: string | null;
+  };
+  ownership: {
+    businessOwner?: string | null;
+    technicalOwner?: string | null;
+    businessDecisionOwner?: string | null;
+    technicalDecisionOwner?: string | null;
+  } | null;
+  dispositions: Array<{
+    id: string;
+    decisionHorizon: ConfidenceHorizon;
+    targetDisposition?: string | null;
+    rationale?: string | null;
+    targetDate?: Date | null;
+    targetPlatform?: string | null;
+    status?: string | null;
+    businessReviewStatus?: ReviewStatus | null;
+    businessSignoffStatus?: ReviewStatus | null;
+    technicalReviewStatus?: ReviewStatus | null;
+    technicalSignoffStatus?: ReviewStatus | null;
+    reviewedAt?: Date | null;
+    updatedAt: Date;
+  }>;
+  notes: Array<{
+    id: string;
+    title?: string | null;
+    content: string;
+    noteType?: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  existingAssessments: Array<{
+    horizonType: ConfidenceHorizon;
+    manualAdjustment: number;
+    assessmentStatus: ConfidenceAssessmentStatus;
+    reviewerName?: string | null;
+    reviewNotes?: string | null;
+    overrideReason?: string | null;
+    reviewedAt?: Date | null;
+  }>;
+}
+```
+
+---
+
+## 29.3 `confidence-rules.ts`
+
+```ts
+import type { ConfidenceBand, ConfidenceFactorCode } from './confidence-types';
+
+export const CONFIDENCE_MODEL_VERSION = 'v1.0';
+
+export const MANUAL_ADJUSTMENT_MIN = -20;
+export const MANUAL_ADJUSTMENT_MAX = 20;
+export const STALE_DAYS_THRESHOLD = 90;
+
+export const FACTOR_ORDER: ConfidenceFactorCode[] = [
+  'DISPOSITION_DEFINITION',
+  'EVIDENCE_QUALITY',
+  'BUSINESS_ALIGNMENT',
+  'TECHNICAL_ALIGNMENT',
+  'EXECUTION_READINESS',
+  'STABILITY_CONSISTENCY',
+];
+
+export const TSA_FACTOR_WEIGHTS: Record<ConfidenceFactorCode, number> = {
+  DISPOSITION_DEFINITION: 20,
+  EVIDENCE_QUALITY: 20,
+  BUSINESS_ALIGNMENT: 20,
+  TECHNICAL_ALIGNMENT: 20,
+  EXECUTION_READINESS: 15,
+  STABILITY_CONSISTENCY: 5,
+};
+
+export const LONG_TERM_FACTOR_WEIGHTS: Record<ConfidenceFactorCode, number> = {
+  DISPOSITION_DEFINITION: 15,
+  EVIDENCE_QUALITY: 20,
+  BUSINESS_ALIGNMENT: 20,
+  TECHNICAL_ALIGNMENT: 25,
+  EXECUTION_READINESS: 10,
+  STABILITY_CONSISTENCY: 10,
+};
+
+export const CONFIDENCE_BANDS: Array<{
+  min: number;
+  max: number;
+  band: ConfidenceBand;
+}> = [
+  { min: 0, max: 39, band: 'LOW' },
+  { min: 40, max: 69, band: 'MEDIUM' },
+  { min: 70, max: 100, band: 'HIGH' },
+];
+```
+
+---
+
+## 29.4 `confidence-utils.ts`
+
+```ts
+import {
+  CONFIDENCE_BANDS,
+  MANUAL_ADJUSTMENT_MAX,
+  MANUAL_ADJUSTMENT_MIN,
+  STALE_DAYS_THRESHOLD,
+} from './confidence-rules';
+import type { ConfidenceBand } from './confidence-types';
+
+export function clampScore(value: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function roundScore(value: number): number {
+  return Math.round(value);
+}
+
+export function clampManualAdjustment(value: number): number {
+  return Math.max(MANUAL_ADJUSTMENT_MIN, Math.min(MANUAL_ADJUSTMENT_MAX, value));
+}
+
+export function deriveConfidenceBand(score: number): ConfidenceBand {
+  const safeScore = clampScore(score);
+  const match = CONFIDENCE_BANDS.find((entry) => safeScore >= entry.min && safeScore <= entry.max);
+
+  if (!match) {
+    return 'LOW';
+  }
+
+  return match.band;
+}
+
+export function daysBetween(from: Date, to: Date): number {
+  const msPerDay = 1000 * 60 * 60 * 24;
+  return Math.floor((to.getTime() - from.getTime()) / msPerDay);
+}
+
+export function isAssessmentStale(reviewedAt: Date | null, now = new Date()): boolean {
+  if (!reviewedAt) {
+    return true;
+  }
+
+  return daysBetween(reviewedAt, now) > STALE_DAYS_THRESHOLD;
+}
+
+export function hasMeaningfulText(value?: string | null, minLength = 10): boolean {
+  return Boolean(value && value.trim().length >= minLength);
+}
+
+export function buildExplanation(parts: string[]): string {
+  return parts.filter(Boolean).join(' ');
+}
+
+export function computeWeightedScore(rawScore: number, weightPercent: number): number {
+  return (clampScore(rawScore) * weightPercent) / 100;
+}
+```
+
+---
+
+## 29.5 `confidence-scoring.ts`
+
+```ts
+import {
+  LONG_TERM_FACTOR_WEIGHTS,
+  TSA_FACTOR_WEIGHTS,
+} from './confidence-rules';
+import {
+  buildExplanation,
+  clampScore,
+  computeWeightedScore,
+  hasMeaningfulText,
+} from './confidence-utils';
+import type {
+  ConfidenceContext,
+  ConfidenceFactorCode,
+  ConfidenceFactorResult,
+  ConfidenceHorizon,
+  ReviewStatus,
+} from './confidence-types';
+
+function getWeight(horizon: ConfidenceHorizon, factorCode: ConfidenceFactorCode): number {
+  return horizon === 'TSA'
+    ? TSA_FACTOR_WEIGHTS[factorCode]
+    : LONG_TERM_FACTOR_WEIGHTS[factorCode];
+}
+
+function getDispositionForHorizon(context: ConfidenceContext, horizon: ConfidenceHorizon) {
+  return context.dispositions.find((item) => item.decisionHorizon === horizon) ?? null;
+}
+
+function isReviewed(status?: ReviewStatus | null): boolean {
+  return status === 'REVIEWED' || status === 'SIGNED_OFF';
+}
+
+function isSignedOff(status?: ReviewStatus | null): boolean {
+  return status === 'SIGNED_OFF';
+}
+
+export function scoreDispositionDefinition(
+  context: ConfidenceContext,
+  horizon: ConfidenceHorizon,
+): ConfidenceFactorResult {
+  const factorCode: ConfidenceFactorCode = 'DISPOSITION_DEFINITION';
+  const disposition = getDispositionForHorizon(context, horizon);
+  const weightPercent = getWeight(horizon, factorCode);
+
+  let rawScore = 0;
+  const helpingSignals: string[] = [];
+  const loweringSignals: string[] = [];
+
+  if (hasMeaningfulText(disposition?.targetDisposition)) {
+    rawScore += 35;
+    helpingSignals.push('Disposition selected.');
+  } else {
+    loweringSignals.push('Disposition not selected.');
+  }
+
+  if (hasMeaningfulText(disposition?.rationale)) {
+    rawScore += 25;
+    helpingSignals.push('Rationale documented.');
+  } else {
+    loweringSignals.push('Rationale missing.');
+  }
+
+  if (disposition?.targetDate) {
+    rawScore += horizon === 'TSA' ? 15 : 10;
+    helpingSignals.push('Target date documented.');
+  } else {
+    loweringSignals.push('Target date missing.');
+  }
+
+  if (hasMeaningfulText(disposition?.targetPlatform)) {
+    rawScore += horizon === 'TSA' ? 15 : 20;
+    helpingSignals.push('Target platform documented.');
+  }
+
+  if (disposition?.targetDisposition && !['TBD', 'UNKNOWN'].includes(disposition.targetDisposition.toUpperCase())) {
+    rawScore += 10;
+    helpingSignals.push('Disposition is not TBD/Unknown.');
+  }
+
+  rawScore = clampScore(rawScore);
+
+  return {
+    factorCode,
+    rawScore,
+    weightPercent,
+    weightedScore: computeWeightedScore(rawScore, weightPercent),
+    maxScore: 100,
+    explanation: buildExplanation([...helpingSignals, ...loweringSignals]),
+    helpingSignals,
+    loweringSignals,
+  };
+}
+
+export function scoreEvidenceQuality(
+  context: ConfidenceContext,
+  horizon: ConfidenceHorizon,
+): ConfidenceFactorResult {
+  const factorCode: ConfidenceFactorCode = 'EVIDENCE_QUALITY';
+  const weightPercent = getWeight(horizon, factorCode);
+
+  let rawScore = 0;
+  const helpingSignals: string[] = [];
+  const loweringSignals: string[] = [];
+
+  const initialAnalysisNote = context.notes.find((note) => {
+    const type = note.noteType?.toLowerCase() ?? '';
+    const title = note.title?.toLowerCase() ?? '';
+    return type.includes('initial') || title.includes('initial analysis');
+  });
+
+  if (initialAnalysisNote) {
+    rawScore += 20;
+    helpingSignals.push('Initial analysis note exists.');
+  } else {
+    loweringSignals.push('Initial analysis note missing.');
+  }
+
+  const meaningfulNote = context.notes.find((note) => hasMeaningfulText(note.content, 40));
+  if (meaningfulNote) {
+    rawScore += 20;
+    helpingSignals.push('Meaningful note exists.');
+  } else {
+    loweringSignals.push('Meaningful note missing.');
+  }
+
+  // Placeholder for candidate app evidence in v1.
+  loweringSignals.push('Candidate app evidence not yet implemented in v1 scoring source.');
+
+  const dependencyNote = context.notes.find((note) => {
+    const text = `${note.title ?? ''} ${note.content}`.toLowerCase();
+    return text.includes('dependency') || text.includes('assumption') || text.includes('blocker');
+  });
+
+  if (dependencyNote) {
+    rawScore += 20;
+    helpingSignals.push('Dependencies or assumptions documented.');
+  } else {
+    loweringSignals.push('Dependencies or assumptions not documented.');
+  }
+
+  const latestReviewedAt = context.dispositions
+    .map((item) => item.reviewedAt)
+    .filter((value): value is Date => Boolean(value))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
+  if (latestReviewedAt) {
+    rawScore += 20;
+    helpingSignals.push('Review date exists.');
+  } else {
+    loweringSignals.push('Review date missing.');
+  }
+
+  rawScore = clampScore(rawScore);
+
+  return {
+    factorCode,
+    rawScore,
+    weightPercent,
+    weightedScore: computeWeightedScore(rawScore, weightPercent),
+    maxScore: 100,
+    explanation: buildExplanation([...helpingSignals, ...loweringSignals]),
+    helpingSignals,
+    loweringSignals,
+  };
+}
+
+export function scoreBusinessAlignment(
+  context: ConfidenceContext,
+  horizon: ConfidenceHorizon,
+): ConfidenceFactorResult {
+  const factorCode: ConfidenceFactorCode = 'BUSINESS_ALIGNMENT';
+  const weightPercent = getWeight(horizon, factorCode);
+  const disposition = getDispositionForHorizon(context, horizon);
+
+  let rawScore = 0;
+  const helpingSignals: string[] = [];
+  const loweringSignals: string[] = [];
+
+  if (hasMeaningfulText(context.ownership?.businessOwner)) {
+    rawScore += 25;
+    helpingSignals.push('Business owner assigned.');
+  } else {
+    loweringSignals.push('Business owner missing.');
+  }
+
+  if (hasMeaningfulText(context.ownership?.businessDecisionOwner)) {
+    rawScore += 25;
+    helpingSignals.push('Business decision owner assigned.');
+  } else {
+    loweringSignals.push('Business decision owner missing.');
+  }
+
+  if (isReviewed(disposition?.businessReviewStatus)) {
+    rawScore += 25;
+    helpingSignals.push('Business review completed.');
+  } else {
+    loweringSignals.push('Business review incomplete.');
+  }
+
+  if (isSignedOff(disposition?.businessSignoffStatus)) {
+    rawScore += 25;
+    helpingSignals.push('Business sign-off recorded.');
+  } else {
+    loweringSignals.push('Business sign-off missing.');
+  }
+
+  rawScore = clampScore(rawScore);
+
+  return {
+    factorCode,
+    rawScore,
+    weightPercent,
+    weightedScore: computeWeightedScore(rawScore, weightPercent),
+    maxScore: 100,
+    explanation: buildExplanation([...helpingSignals, ...loweringSignals]),
+    helpingSignals,
+    loweringSignals,
+  };
+}
+
+export function scoreTechnicalAlignment(
+  context: ConfidenceContext,
+  horizon: ConfidenceHorizon,
+): ConfidenceFactorResult {
+  const factorCode: ConfidenceFactorCode = 'TECHNICAL_ALIGNMENT';
+  const weightPercent = getWeight(horizon, factorCode);
+  const disposition = getDispositionForHorizon(context, horizon);
+
+  let rawScore = 0;
+  const helpingSignals: string[] = [];
+  const loweringSignals: string[] = [];
+
+  if (hasMeaningfulText(context.ownership?.technicalOwner)) {
+    rawScore += 25;
+    helpingSignals.push('Technical owner assigned.');
+  } else {
+    loweringSignals.push('Technical owner missing.');
+  }
+
+  if (hasMeaningfulText(context.ownership?.technicalDecisionOwner)) {
+    rawScore += 25;
+    helpingSignals.push('Technical decision owner assigned.');
+  } else {
+    loweringSignals.push('Technical decision owner missing.');
+  }
+
+  if (isReviewed(disposition?.technicalReviewStatus)) {
+    rawScore += 25;
+    helpingSignals.push('Technical review completed.');
+  } else {
+    loweringSignals.push('Technical review incomplete.');
+  }
+
+  if (isSignedOff(disposition?.technicalSignoffStatus)) {
+    rawScore += 25;
+    helpingSignals.push('Technical sign-off recorded.');
+  } else {
+    loweringSignals.push('Technical sign-off missing.');
+  }
+
+  rawScore = clampScore(rawScore);
+
+  return {
+    factorCode,
+    rawScore,
+    weightPercent,
+    weightedScore: computeWeightedScore(rawScore, weightPercent),
+    maxScore: 100,
+    explanation: buildExplanation([...helpingSignals, ...loweringSignals]),
+    helpingSignals,
+    loweringSignals,
+  };
+}
+
+export function scoreExecutionReadiness(
+  context: ConfidenceContext,
+  horizon: ConfidenceHorizon,
+): ConfidenceFactorResult {
+  const factorCode: ConfidenceFactorCode = 'EXECUTION_READINESS';
+  const weightPercent = getWeight(horizon, factorCode);
+  const disposition = getDispositionForHorizon(context, horizon);
+
+  let rawScore = 0;
+  const helpingSignals: string[] = [];
+  const loweringSignals: string[] = [];
+
+  if (disposition?.targetDate) {
+    rawScore += horizon === 'TSA' ? 30 : 20;
+    helpingSignals.push('Target date exists.');
+  } else {
+    loweringSignals.push('Target date missing.');
+  }
+
+  if (hasMeaningfulText(disposition?.status) && !['NOT_STARTED', 'UNKNOWN'].includes((disposition?.status ?? '').toUpperCase())) {
+    rawScore += 20;
+    helpingSignals.push('Status reflects progression.');
+  } else {
+    loweringSignals.push('Status does not reflect progression.');
+  }
+
+  if (horizon === 'TSA' && hasMeaningfulText(disposition?.targetDisposition)) {
+    rawScore += 20;
+    helpingSignals.push('TSA disposition is actionable.');
+  }
+
+  const blockerNote = context.notes.find((note) => note.content.toLowerCase().includes('blocker'));
+  if (blockerNote) {
+    rawScore += 15;
+    helpingSignals.push('Blockers or issues documented.');
+  } else {
+    loweringSignals.push('Blockers or issues not documented.');
+  }
+
+  if (hasMeaningfulText(disposition?.targetPlatform)) {
+    rawScore += horizon === 'TSA' ? 15 : 30;
+    helpingSignals.push('Target platform exists.');
+  } else if (horizon === 'LONG_TERM') {
+    loweringSignals.push('Long-term target platform missing.');
+  }
+
+  if (horizon === 'LONG_TERM') {
+    const transitionNote = context.notes.find((note) => {
+      const text = note.content.toLowerCase();
+      return text.includes('transition') || text.includes('destination') || text.includes('migration');
+    });
+
+    if (transitionNote) {
+      rawScore += 15;
+      helpingSignals.push('Transition path or destination is defined.');
+    } else {
+      loweringSignals.push('Transition path or destination is not defined.');
+    }
+  }
+
+  rawScore = clampScore(rawScore);
+
+  return {
+    factorCode,
+    rawScore,
+    weightPercent,
+    weightedScore: computeWeightedScore(rawScore, weightPercent),
+    maxScore: 100,
+    explanation: buildExplanation([...helpingSignals, ...loweringSignals]),
+    helpingSignals,
+    loweringSignals,
+  };
+}
+
+export function scoreStabilityConsistency(
+  context: ConfidenceContext,
+  horizon: ConfidenceHorizon,
+): ConfidenceFactorResult {
+  const factorCode: ConfidenceFactorCode = 'STABILITY_CONSISTENCY';
+  const weightPercent = getWeight(horizon, factorCode);
+  const disposition = getDispositionForHorizon(context, horizon);
+
+  let rawScore = 0;
+  const helpingSignals: string[] = [];
+  const loweringSignals: string[] = [];
+
+  if (disposition?.targetDisposition) {
+    rawScore += 30;
+    helpingSignals.push('No obvious conflicting disposition data detected in v1 heuristic.');
+  } else {
+    loweringSignals.push('Disposition missing, so consistency is weaker.');
+  }
+
+  const contradictionNote = context.notes.find((note) => {
+    const text = note.content.toLowerCase();
+    return text.includes('contradict') || text.includes('conflict');
+  });
+
+  if (!contradictionNote) {
+    rawScore += 20;
+    helpingSignals.push('No contradiction note detected.');
+  } else {
+    loweringSignals.push('Potential contradiction noted.');
+  }
+
+  rawScore += 20;
+  helpingSignals.push('Disposition churn logic deferred in v1; neutral placeholder applied.');
+
+  if (
+    disposition?.targetDisposition &&
+    (hasMeaningfulText(disposition?.rationale) || hasMeaningfulText(disposition?.targetPlatform) || disposition?.targetDate)
+  ) {
+    rawScore += 30;
+    helpingSignals.push('Related supporting fields are internally consistent.');
+  } else {
+    loweringSignals.push('Supporting fields for disposition appear incomplete.');
+  }
+
+  rawScore = clampScore(rawScore);
+
+  return {
+    factorCode,
+    rawScore,
+    weightPercent,
+    weightedScore: computeWeightedScore(rawScore, weightPercent),
+    maxScore: 100,
+    explanation: buildExplanation([...helpingSignals, ...loweringSignals]),
+    helpingSignals,
+    loweringSignals,
+  };
+}
+```
+
+---
+
+## 29.6 `confidence-repository.ts`
+
+```ts
+import type { PrismaClient } from '@prisma/client';
+import type {
+  ConfidenceContext,
+  ConfidenceHorizon,
+  HorizonConfidenceResult,
+} from './confidence-types';
+
+export async function loadConfidenceContext(
+  prisma: PrismaClient,
+  applicationId: string,
+): Promise<ConfidenceContext> {
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: {
+      ownership: true,
+      dispositionDecisions: true,
+      notes: true,
+      confidenceAssessments: true,
+    },
+  });
+
+  if (!application) {
+    throw new Error(`Application not found: ${applicationId}`);
+  }
+
+  return {
+    application: {
+      id: application.id,
+      name: 'name' in application ? application.name ?? null : null,
+    },
+    ownership: application.ownership,
+    dispositions: application.dispositionDecisions.map((item) => ({
+      id: item.id,
+      decisionHorizon: item.decisionHorizon as ConfidenceHorizon,
+      targetDisposition: item.targetDisposition,
+      rationale: item.rationale,
+      targetDate: item.targetDate,
+      targetPlatform: item.targetPlatform,
+      status: item.status,
+      businessReviewStatus: item.businessReviewStatus as any,
+      businessSignoffStatus: item.businessSignoffStatus as any,
+      technicalReviewStatus: item.technicalReviewStatus as any,
+      technicalSignoffStatus: item.technicalSignoffStatus as any,
+      reviewedAt: item.reviewedAt,
+      updatedAt: item.updatedAt,
+    })),
+    notes: application.notes.map((note) => ({
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      noteType: note.noteType,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    })),
+    existingAssessments: application.confidenceAssessments.map((item) => ({
+      horizonType: item.horizonType as ConfidenceHorizon,
+      manualAdjustment: item.manualAdjustment,
+      assessmentStatus: item.assessmentStatus as any,
+      reviewerName: item.reviewerName,
+      reviewNotes: item.reviewNotes,
+      overrideReason: item.overrideReason,
+      reviewedAt: item.reviewedAt,
+    })),
+  };
+}
+
+export async function upsertHorizonAssessment(
+  prisma: PrismaClient,
+  applicationId: string,
+  result: HorizonConfidenceResult,
+): Promise<void> {
+  const assessment = await prisma.confidenceAssessment.upsert({
+    where: {
+      applicationId_horizonType: {
+        applicationId,
+        horizonType: result.horizonType,
+      },
+    },
+    create: {
+      applicationId,
+      horizonType: result.horizonType,
+      calculatedScore: result.calculatedScore,
+      manualAdjustment: result.manualAdjustment,
+      finalScore: result.finalScore,
+      confidenceBand: result.confidenceBand,
+      scoringModelVersion: result.scoringModelVersion,
+      assessmentStatus: result.assessmentStatus,
+      reviewerName: result.reviewerName,
+      reviewNotes: result.reviewNotes,
+      overrideReason: result.overrideReason,
+      isStale: result.isStale,
+      calculatedAt: result.calculatedAt,
+      reviewedAt: result.reviewedAt,
+    },
+    update: {
+      calculatedScore: result.calculatedScore,
+      manualAdjustment: result.manualAdjustment,
+      finalScore: result.finalScore,
+      confidenceBand: result.confidenceBand,
+      scoringModelVersion: result.scoringModelVersion,
+      assessmentStatus: result.assessmentStatus,
+      reviewerName: result.reviewerName,
+      reviewNotes: result.reviewNotes,
+      overrideReason: result.overrideReason,
+      isStale: result.isStale,
+      calculatedAt: result.calculatedAt,
+      reviewedAt: result.reviewedAt,
+    },
+  });
+
+  await Promise.all(
+    result.factorScores.map((factor) =>
+      prisma.confidenceFactorScore.upsert({
+        where: {
+          confidenceAssessmentId_factorCode: {
+            confidenceAssessmentId: assessment.id,
+            factorCode: factor.factorCode,
+          },
+        },
+        create: {
+          confidenceAssessmentId: assessment.id,
+          factorCode: factor.factorCode,
+          rawScore: factor.rawScore,
+          weightPercent: factor.weightPercent,
+          weightedScore: factor.weightedScore,
+          maxScore: factor.maxScore,
+          explanation: factor.explanation,
+        },
+        update: {
+          rawScore: factor.rawScore,
+          weightPercent: factor.weightPercent,
+          weightedScore: factor.weightedScore,
+          maxScore: factor.maxScore,
+          explanation: factor.explanation,
+        },
+      }),
+    ),
+  );
+}
+```
+
+---
+
+## 29.7 `confidence-engine.ts`
+
+```ts
+import type { PrismaClient } from '@prisma/client';
+import { CONFIDENCE_MODEL_VERSION } from './confidence-rules';
+import {
+  scoreBusinessAlignment,
+  scoreDispositionDefinition,
+  scoreEvidenceQuality,
+  scoreExecutionReadiness,
+  scoreStabilityConsistency,
+  scoreTechnicalAlignment,
+} from './confidence-scoring';
+import { loadConfidenceContext, upsertHorizonAssessment } from './confidence-repository';
+import {
+  clampScore,
+  deriveConfidenceBand,
+  isAssessmentStale,
+  roundScore,
+} from './confidence-utils';
+import type {
+  ApplicationConfidenceResponse,
+  ConfidenceContext,
+  ConfidenceFactorResult,
+  ConfidenceHorizon,
+  HorizonConfidenceResult,
+} from './confidence-types';
+
+export class ConfidenceEngine {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async calculateAndPersist(applicationId: string): Promise<ApplicationConfidenceResponse> {
+    const context = await loadConfidenceContext(this.prisma, applicationId);
+    const tsa = this.calculateHorizon(context, 'TSA');
+    const longTerm = this.calculateHorizon(context, 'LONG_TERM');
+
+    await upsertHorizonAssessment(this.prisma, applicationId, tsa);
+    await upsertHorizonAssessment(this.prisma, applicationId, longTerm);
+
+    return {
+      applicationId,
+      tsa,
+      longTerm,
+    };
+  }
+
+  async calculateOnly(applicationId: string): Promise<ApplicationConfidenceResponse> {
+    const context = await loadConfidenceContext(this.prisma, applicationId);
+
+    return {
+      applicationId,
+      tsa: this.calculateHorizon(context, 'TSA'),
+      longTerm: this.calculateHorizon(context, 'LONG_TERM'),
+    };
+  }
+
+  private calculateHorizon(
+    context: ConfidenceContext,
+    horizon: ConfidenceHorizon,
+  ): HorizonConfidenceResult {
+    const now = new Date();
+    const existing = context.existingAssessments.find((item) => item.horizonType === horizon);
+
+    const factorScores: ConfidenceFactorResult[] = [
+      scoreDispositionDefinition(context, horizon),
+      scoreEvidenceQuality(context, horizon),
+      scoreBusinessAlignment(context, horizon),
+      scoreTechnicalAlignment(context, horizon),
+      scoreExecutionReadiness(context, horizon),
+      scoreStabilityConsistency(context, horizon),
+    ];
+
+    const calculatedScore = roundScore(
+      factorScores.reduce((sum, factor) => sum + factor.weightedScore, 0),
+    );
+
+    const manualAdjustment = existing?.manualAdjustment ?? 0;
+    const finalScore = clampScore(calculatedScore + manualAdjustment);
+    const reviewedAt = existing?.reviewedAt ?? null;
+
+    return {
+      horizonType: horizon,
+      calculatedScore,
+      manualAdjustment,
+      finalScore,
+      confidenceBand: deriveConfidenceBand(finalScore),
+      assessmentStatus: existing?.assessmentStatus ?? 'SYSTEM_CALCULATED',
+      scoringModelVersion: CONFIDENCE_MODEL_VERSION,
+      isStale: isAssessmentStale(reviewedAt, now),
+      calculatedAt: now,
+      reviewedAt,
+      reviewerName: existing?.reviewerName ?? null,
+      reviewNotes: existing?.reviewNotes ?? null,
+      overrideReason: existing?.overrideReason ?? null,
+      factorScores,
+    };
+  }
+}
+```
+
+---
+
+## 29.8 Route usage example
+
+```ts
+import { prisma } from '@/lib/prisma';
+import { ConfidenceEngine } from '@/lib/confidence/confidence-engine';
+
+const confidenceEngine = new ConfidenceEngine(prisma);
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const result = await confidenceEngine.calculateOnly(id);
+
+  return Response.json(result);
+}
+```
+
+### Recalculate example
+
+```ts
+import { prisma } from '@/lib/prisma';
+import { ConfidenceEngine } from '@/lib/confidence/confidence-engine';
+
+const confidenceEngine = new ConfidenceEngine(prisma);
+
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const result = await confidenceEngine.calculateAndPersist(id);
+
+  return Response.json(result);
+}
+```
+
+---
+
+## 29.9 Manual adjustment service sketch
+
+This is not the full route, but it shows how manual review data should be applied independently of score recalculation.
+
+```ts
+import type { PrismaClient } from '@prisma/client';
+import {
+  MANUAL_ADJUSTMENT_MAX,
+  MANUAL_ADJUSTMENT_MIN,
+} from './confidence-rules';
+import type {
+  ConfidenceAssessmentStatus,
+  ConfidenceHorizon,
+} from './confidence-types';
+
+interface UpdateConfidenceReviewInput {
+  applicationId: string;
+  horizonType: ConfidenceHorizon;
+  manualAdjustment: number;
+  overrideReason?: string | null;
+  reviewNotes?: string | null;
+  reviewerName?: string | null;
+  assessmentStatus: ConfidenceAssessmentStatus;
+}
+
+export async function updateConfidenceReview(
+  prisma: PrismaClient,
+  input: UpdateConfidenceReviewInput,
+) {
+  if (
+    input.manualAdjustment < MANUAL_ADJUSTMENT_MIN ||
+    input.manualAdjustment > MANUAL_ADJUSTMENT_MAX
+  ) {
+    throw new Error('Manual adjustment is out of allowed range.');
+  }
+
+  if (input.manualAdjustment !== 0 && !input.overrideReason?.trim()) {
+    throw new Error('Override reason is required when manual adjustment is non-zero.');
+  }
+
+  return prisma.confidenceAssessment.update({
+    where: {
+      applicationId_horizonType: {
+        applicationId: input.applicationId,
+        horizonType: input.horizonType,
+      },
+    },
+    data: {
+      manualAdjustment: input.manualAdjustment,
+      overrideReason: input.overrideReason ?? null,
+      reviewNotes: input.reviewNotes ?? null,
+      reviewerName: input.reviewerName ?? null,
+      assessmentStatus: input.assessmentStatus,
+      reviewedAt: new Date(),
+    },
+  });
+}
+```
+
+---
+
+## 29.10 Implementation notes
+
+### Strong recommendations
+- keep factor scoring functions pure and side-effect free
+- keep Prisma access out of scoring functions
+- keep manual review updates separate from recalculation logic
+- persist both calculated and final scores for easy filtering and traceability
+- treat explanation text as required output, not optional decoration
+
+### First-cut simplifications that are acceptable
+- use heuristic note parsing in v1
+- use `reviewerName` string instead of a user relation
+- use current-state-only assessments instead of history snapshots
+- score candidate-app evidence as placeholder logic until candidate app data is structured
+
+### Areas likely to evolve next
+- richer applicability logic for “target platform if relevant”
+- churn/history-based stability scoring
+- typed evidence model
+- score history snapshots by model version
+
+---
+
+## 30. Sample Application Scoring Walkthrough
+
+This section provides a concrete sample showing how the confidence model would behave for a realistic application record. The goal is to make the scoring model easier to validate and discuss with stakeholders.
+
+---
+
+## 30.1 Sample application profile
+
+### Application
+**Order Tracking Legacy**
+
+### Business context
+A legacy order-tracking application from an acquired business unit. It remains needed during the TSA period, but the likely long-term direction is migration into an existing enterprise platform.
+
+### Recorded disposition state
+
+#### TSA horizon
+- TSA disposition: **Retain for TSA / Transitional Use**
+- TSA rationale: documented
+- TSA target date: present
+- TSA target platform: not applicable / not required for the short-term transitional state
+- TSA status: **In Progress**
+
+#### Long-term horizon
+- Long-term disposition: **Migrate to Enterprise Order Platform**
+- Long-term rationale: documented
+- Long-term target date: present
+- Long-term target platform: documented
+- Long-term status: **In Progress**
+
+### Ownership state
+- Business owner: assigned
+- Business decision owner: assigned
+- Technical owner: assigned
+- Technical decision owner: missing
+
+### Review / sign-off state
+#### TSA
+- Business review: completed
+- Business sign-off: completed
+- Technical review: completed
+- Technical sign-off: not yet completed
+
+#### Long-term
+- Business review: completed
+- Business sign-off: not yet completed
+- Technical review: completed
+- Technical sign-off: not yet completed
+
+### Notes / evidence state
+- Initial analysis note exists
+- Multiple substantive notes exist
+- Notes mention dependencies and blockers
+- Transition approach is described in notes
+- Candidate replacement applications are discussed, but not yet stored as structured candidate-app records
+- Recent review date exists
+
+---
+
+## 30.2 Sample raw factor scoring – TSA
+
+### Disposition Definition
+**Assessment:** strong
+
+| Rule | Points | Result |
+|---|---:|---|
+| TSA disposition selected | 35 | 35 |
+| TSA rationale documented | 25 | 25 |
+| TSA target date documented | 15 | 15 |
+| TSA target platform documented if applicable | 15 | 15 *(treated as not applicable / neutralized)* |
+| TSA disposition not TBD / Unknown | 10 | 10 |
+| **Raw score** | **100** | **100** |
+
+### Evidence Quality
+**Assessment:** good but not perfect in structured-data terms
+
+| Rule | Points | Result |
+|---|---:|---|
+| Initial analysis note exists | 20 | 20 |
+| Meaningful note exists | 20 | 20 |
+| Candidate apps documented where relevant | 20 | 10 *(discussed in notes, not structured)* |
+| Dependencies / assumptions documented | 20 | 20 |
+| Review date exists and is current | 20 | 20 |
+| **Raw score** | **100** | **90** |
+
+### Business Alignment
+**Assessment:** complete
+
+| Rule | Points | Result |
+|---|---:|---|
+| Business owner assigned | 25 | 25 |
+| Business decision owner assigned | 25 | 25 |
+| Business review completed | 25 | 25 |
+| Business sign-off recorded | 25 | 25 |
+| **Raw score** | **100** | **100** |
+
+### Technical Alignment
+**Assessment:** mostly strong, one key gap
+
+| Rule | Points | Result |
+|---|---:|---|
+| Technical owner assigned | 25 | 25 |
+| Technical decision owner assigned | 25 | 0 |
+| Technical feasibility assessed / review completed | 25 | 25 |
+| Technical sign-off recorded | 25 | 0 |
+| **Raw score** | **100** | **50** |
+
+### Execution Readiness
+**Assessment:** strong for short-term execution
+
+| Rule | Points | Result |
+|---|---:|---|
+| TSA target date exists | 30 | 30 |
+| TSA status is not Not Started / Unknown | 20 | 20 |
+| TSA disposition is actionable | 20 | 20 |
+| TSA blockers / open issues documented | 15 | 15 |
+| TSA target platform documented if relevant | 15 | 15 *(treated as not applicable / neutralized)* |
+| **Raw score** | **100** | **100** |
+
+### Stability / Consistency
+**Assessment:** strong
+
+| Rule | Points | Result |
+|---|---:|---|
+| No conflicting disposition data | 30 | 30 |
+| No major unresolved contradictions in notes | 20 | 20 |
+| No recent disposition churn | 20 | 20 |
+| Required related fields are internally consistent | 30 | 30 |
+| **Raw score** | **100** | **100** |
+
+---
+
+## 30.3 TSA weighted result
+
+Using TSA weights:
+
+| Factor | Raw Score | Weight % | Weighted Score |
+|---|---:|---:|---:|
+| Disposition Definition | 100 | 20 | 20.0 |
+| Evidence Quality | 90 | 20 | 18.0 |
+| Business Alignment | 100 | 20 | 20.0 |
+| Technical Alignment | 50 | 20 | 10.0 |
+| Execution Readiness | 100 | 15 | 15.0 |
+| Stability / Consistency | 100 | 5 | 5.0 |
+| **Calculated TSA Score** |  |  | **88.0** |
+
+### TSA final result
+- Calculated TSA score: **88**
+- Manual adjustment: **0**
+- Final TSA score: **88**
+- Confidence band: **High**
+
+### TSA interpretation
+The transitional disposition is highly credible and operationally ready. The main gap is technical governance maturity, not the disposition itself.
+
+---
+
+## 30.4 Sample raw factor scoring – Long-term
+
+### Disposition Definition
+**Assessment:** strong
+
+| Rule | Points | Result |
+|---|---:|---|
+| Long-term disposition selected | 35 | 35 |
+| Long-term rationale documented | 25 | 25 |
+| Long-term target date documented | 10 | 10 |
+| Long-term target platform documented | 20 | 20 |
+| Long-term disposition not TBD / Unknown | 10 | 10 |
+| **Raw score** | **100** | **100** |
+
+### Evidence Quality
+**Assessment:** good, but candidate-app evidence still not fully structured
+
+| Rule | Points | Result |
+|---|---:|---|
+| Initial analysis note exists | 20 | 20 |
+| Meaningful note exists | 20 | 20 |
+| Candidate apps documented where relevant | 20 | 10 |
+| Dependencies / assumptions documented | 20 | 20 |
+| Review date exists and is current | 20 | 20 |
+| **Raw score** | **100** | **90** |
+
+### Business Alignment
+**Assessment:** mostly strong, but not fully approved
+
+| Rule | Points | Result |
+|---|---:|---|
+| Business owner assigned | 25 | 25 |
+| Business decision owner assigned | 25 | 25 |
+| Business review completed | 25 | 25 |
+| Business sign-off recorded | 25 | 0 |
+| **Raw score** | **100** | **75** |
+
+### Technical Alignment
+**Assessment:** meaningful gaps remain
+
+| Rule | Points | Result |
+|---|---:|---|
+| Technical owner assigned | 25 | 25 |
+| Technical decision owner assigned | 25 | 0 |
+| Technical feasibility assessed / review completed | 25 | 25 |
+| Technical sign-off recorded | 25 | 0 |
+| **Raw score** | **100** | **50** |
+
+### Execution Readiness
+**Assessment:** decent, but not fully locked down
+
+| Rule | Points | Result |
+|---|---:|---|
+| Long-term target date exists | 20 | 20 |
+| Long-term target platform exists | 30 | 30 |
+| Long-term status reflects progression | 20 | 20 |
+| Dependencies / blockers documented | 15 | 15 |
+| Transition path or destination defined | 15 | 15 |
+| **Raw score** | **100** | **100** |
+
+### Stability / Consistency
+**Assessment:** strong
+
+| Rule | Points | Result |
+|---|---:|---|
+| No conflicting disposition data | 30 | 30 |
+| No major unresolved contradictions in notes | 20 | 20 |
+| No recent disposition churn | 20 | 20 |
+| Required related fields are internally consistent | 30 | 30 |
+| **Raw score** | **100** | **100** |
+
+---
+
+## 30.5 Long-term weighted result
+
+Using Long-term weights:
+
+| Factor | Raw Score | Weight % | Weighted Score |
+|---|---:|---:|---:|
+| Disposition Definition | 100 | 15 | 15.0 |
+| Evidence Quality | 90 | 20 | 18.0 |
+| Business Alignment | 75 | 20 | 15.0 |
+| Technical Alignment | 50 | 25 | 12.5 |
+| Execution Readiness | 100 | 10 | 10.0 |
+| Stability / Consistency | 100 | 10 | 10.0 |
+| **Calculated Long-term Score** |  |  | **80.5** |
+
+### Long-term final result
+- Calculated Long-term score: **81**
+- Manual adjustment: **0**
+- Final Long-term score: **81**
+- Confidence band: **High**
+
+### Long-term interpretation
+The long-term disposition is directionally strong and reasonably well-supported, but still held back by incomplete technical decision ownership and missing technical sign-off.
+
+---
+
+## 30.6 Why this sample is useful
+
+This sample demonstrates several important behaviors of the model:
+
+- a score can still be high even when a few governance gaps remain
+- technical alignment issues meaningfully reduce confidence without collapsing the full score
+- notes and rationale materially help the score
+- the model distinguishes between short-term execution confidence and long-term strategic confidence
+- candidate-app structure matters, but absence of that structure does not make the whole model unusable in v1
+
+---
+
+## 30.7 Example UI narrative for this application
+
+### Application list display
+- TSA Confidence: **88 High**
+- Long-term Confidence: **81 High**
+
+### Detail page explanation
+**What is helping confidence**
+- Disposition and rationale are documented for both horizons
+- Business ownership is clear
+- Review activity is present
+- Dependencies and transition notes exist
+
+**What is lowering confidence**
+- Technical decision owner is missing
+- Technical sign-off is incomplete
+- Candidate replacement-app evidence is not yet structured
+
+---
+
+## 30.8 Suggested follow-up actions from this sample
+
+For this application, the next actions implied by the model would be:
+- assign technical decision owner
+- complete technical sign-off for TSA
+- complete business and technical sign-off for Long-term
+- convert candidate replacement-app evidence from notes into structured data when that capability exists
+
+This is exactly the kind of work-queue behavior the confidence model should drive.
 
 ---
 
 ## Revision History
 
-| Version | Date       | Notes                                                                                             |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------- |
-| v1.2    | 2026-03-28 | Added developer-ready checklist covering schema, API, UI, and testing work                        |
-| v1.1    | 2026-03-28 | Added build task plan, dependencies, milestone acceptance criteria, and implementation sequencing |
-| v1.0    | 2026-03-28 | Initial canvas-ready implementation spec for Confidence Grading                                   |
-
-| Version | Date       | Notes                                                                                             |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------- |
-| v1.1    | 2026-03-28 | Added build task plan, dependencies, milestone acceptance criteria, and implementation sequencing |
-| v1.0    | 2026-03-28 | Initial canvas-ready implementation spec for Confidence Grading                                   |
-
-| Version | Date       | Notes                                                           |
-| ------- | ---------- | --------------------------------------------------------------- |
-| v1.0    | 2026-03-28 | Initial canvas-ready implementation spec for Confidence Grading |
+| Version | Date | Notes |
+|---|---|---|
+| v1.4 | 2026-03-29 | Added TypeScript confidence engine skeleton and repository/orchestration patterns |
+| v1.3 | 2026-03-29 | Added Prisma schema draft and migration guidance |
+| v1.2 | 2026-03-28 | Added developer checklist and build plan |
+| v1.1 | 2026-03-28 | Added phased implementation plan |
+| v1.0 | 2026-03-28 | Initial spec |
 
