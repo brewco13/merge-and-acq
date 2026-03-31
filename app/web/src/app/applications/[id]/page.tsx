@@ -4,10 +4,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
+import { ConfidenceSection } from '@/components/applications/ConfidenceSection';
+
+import { ConfidenceEngine } from "@/lib/confidence/confidence-engine";
+
+
 type PageProps = {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
+    searchParams?: Promise<{ confidenceRecalculated?: string }>;
 };
 
 function formatDate(value: Date | null) {
@@ -61,8 +65,14 @@ function DecisionRow({
   );
 }
 
-export default async function ApplicationDetailPage({ params }: PageProps) {
+
+
+
+export default async function ApplicationDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const confidenceRecalculated = resolvedSearchParams?.confidenceRecalculated;
+
 
   const application = await prisma.application.findUnique({
   where: { id },
@@ -84,6 +94,17 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   if (!application) {
     notFound();
   }
+
+  let confidence = null;
+
+  try {
+    const engine = new ConfidenceEngine(prisma);
+    confidence = await engine.calculateOnly(id);
+  } catch (error) {
+    console.error("Failed to load confidence for application detail page:", error);
+  }
+
+
 
 const ownership = application.Ownership[0] ?? null;
 
@@ -113,6 +134,10 @@ const longTermDecision =
         <Link href={`/applications/${application.id}/disposition`}>Edit disposition</Link>
         <Link href={`/applications/${application.id}/notes`}>Edit notes</Link>
       </div>
+
+
+
+
 
       <h1 style={{ marginBottom: 4 }}>{application.name}</h1>
       <p style={{ marginTop: 0, color: "#666" }}>Application detail record</p>
@@ -199,6 +224,59 @@ const longTermDecision =
           <DecisionRow label="Rationale" value={longTermDecision?.rationale} />
         </tbody>
       </table>
+
+
+      <h2>Confidence</h2>
+
+<form action={`/api/applications/${id}/confidence/recalculate`} method="POST">
+  <button
+    type="submit"
+    style={{
+      padding: "8px 12px",
+      border: "1px solid #ccc",
+      borderRadius: 6,
+      cursor: "pointer",
+      marginTop: 10,
+    }}
+  >
+    Recalculate Confidence
+  </button>
+</form>
+
+      {confidenceRecalculated === '1' ? (
+        <div
+          style={{
+            marginTop: 12,
+            marginBottom: 12,
+            padding: 10,
+            border: '1px solid #b7e4c7',
+            backgroundColor: '#f0fff4',
+            borderRadius: 6,
+            color: '#1f5f3a',
+          }}
+        >
+          Confidence recalculated successfully.
+        </div>
+      ) : null}
+
+      {confidenceRecalculated === 'error' ? (
+        <div
+          style={{
+            marginTop: 12,
+            marginBottom: 12,
+            padding: 10,
+            border: '1px solid #f5c2c7',
+            backgroundColor: '#fff5f5',
+            borderRadius: 6,
+            color: '#842029',
+          }}
+        >
+          Confidence recalculation failed.
+        </div>
+      ) : null}
+
+<ConfidenceSection confidence={confidence} />
+
 
       <h2>Notes</h2>
       <table
