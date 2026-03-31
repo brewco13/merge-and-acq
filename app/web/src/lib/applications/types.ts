@@ -20,6 +20,12 @@ export type FilterOptionsResponse = {
   targetDispositions: DispositionType[];
 };
 
+export type ApplicationConfidenceSummary = {
+  finalScore: number;
+  confidenceBand: "LOW" | "MEDIUM" | "HIGH";
+  isStale: boolean;
+} | null;
+
 export type ApplicationListItem = {
   id: string;
   legacyId: string | null;
@@ -29,6 +35,8 @@ export type ApplicationListItem = {
   updatedAt: Date;
   ownershipCount: number;
   latestTargetDisposition: DispositionType | null;
+  tsaConfidence: ApplicationConfidenceSummary;
+  longTermConfidence: ApplicationConfidenceSummary;
 };
 
 export type PaginatedApplicationResults = {

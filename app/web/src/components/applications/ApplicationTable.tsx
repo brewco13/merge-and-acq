@@ -5,6 +5,21 @@ type Props = {
   results: PaginatedApplicationResults;
 };
 
+function formatConfidence(
+  confidence:
+    | {
+        finalScore: number;
+        confidenceBand: "LOW" | "MEDIUM" | "HIGH";
+        isStale: boolean;
+      }
+    | null
+) {
+  if (!confidence) return "—";
+
+  const stale = confidence.isStale ? " ⚠" : "";
+  return `${confidence.finalScore} ${confidence.confidenceBand}${stale}`;
+}
+
 export default function ApplicationTable({ results }: Props) {
   return (
     <table
@@ -21,6 +36,8 @@ export default function ApplicationTable({ results }: Props) {
           <th style={{ padding: "10px 8px" }}>Business Area</th>
           <th style={{ padding: "10px 8px" }}>Ownership</th>
           <th style={{ padding: "10px 8px" }}>Disposition</th>
+          <th style={{ padding: "10px 8px" }}>TSA Confidence</th>
+          <th style={{ padding: "10px 8px" }}>LT Confidence</th>
           <th style={{ padding: "10px 8px" }}>Updated</th>
         </tr>
       </thead>
@@ -43,6 +60,12 @@ export default function ApplicationTable({ results }: Props) {
               {app.latestTargetDisposition ?? "—"}
             </td>
             <td style={{ padding: "10px 8px" }}>
+              {formatConfidence(app.tsaConfidence)}
+            </td>
+            <td style={{ padding: "10px 8px" }}>
+              {formatConfidence(app.longTermConfidence)}
+            </td>
+            <td style={{ padding: "10px 8px" }}>
               {new Intl.DateTimeFormat("en-US", {
                 dateStyle: "medium",
                 timeStyle: "short",
@@ -53,7 +76,7 @@ export default function ApplicationTable({ results }: Props) {
 
         {results.items.length === 0 && (
           <tr>
-            <td colSpan={6} style={{ padding: "16px 8px", color: "#666" }}>
+            <td colSpan={8} style={{ padding: "16px 8px", color: "#666" }}>
               No applications match the current filters.
             </td>
           </tr>

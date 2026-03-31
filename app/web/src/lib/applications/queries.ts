@@ -66,6 +66,7 @@ export function buildApplicationOrderBy(
   }
 }
 
+
 function mapApplicationRow(row: {
   id: string;
   legacyId: string | null;
@@ -78,11 +79,25 @@ function mapApplicationRow(row: {
     targetDisposition: DispositionType | null;
     updatedAt: Date;
   }>;
+  ConfidenceAssessment: Array<{
+    horizonType: "TSA" | "LONG_TERM";
+    finalScore: number;
+    confidenceBand: "LOW" | "MEDIUM" | "HIGH";
+    isStale: boolean;
+  }>;
 }): ApplicationListItem {
   const latestDisposition =
     row.DispositionDecision.length > 0
       ? row.DispositionDecision[0].targetDisposition
       : null;
+
+  const tsa = row.ConfidenceAssessment.find(
+    (c) => c.horizonType === "TSA"
+  );
+
+  const longTerm = row.ConfidenceAssessment.find(
+    (c) => c.horizonType === "LONG_TERM"
+  );
 
   return {
     id: row.id,
@@ -93,6 +108,20 @@ function mapApplicationRow(row: {
     updatedAt: row.updatedAt,
     ownershipCount: row.Ownership.length,
     latestTargetDisposition: latestDisposition,
+    tsaConfidence: tsa
+      ? {
+          finalScore: tsa.finalScore,
+          confidenceBand: tsa.confidenceBand,
+          isStale: tsa.isStale,
+        }
+      : null,
+    longTermConfidence: longTerm
+      ? {
+          finalScore: longTerm.finalScore,
+          confidenceBand: longTerm.confidenceBand,
+          isStale: longTerm.isStale,
+        }
+      : null,
   };
 }
 
@@ -109,25 +138,40 @@ export async function getApplications(
       orderBy,
       skip,
       take: filters.pageSize,
-      select: {
-        id: true,
-        legacyId: true,
-        name: true,
-        businessArea: true,
-        description: true,
-        updatedAt: true,
-        Ownership: {
-          select: { id: true },
-        },
-        DispositionDecision: {
-          orderBy: [{ updatedAt: "desc" }],
-          take: 1,
-          select: {
-            targetDisposition: true,
-            updatedAt: true,
-          },
-        },
-      },
+
+
+
+select: {
+  id: true,
+  legacyId: true,
+  name: true,
+  businessArea: true,
+  description: true,
+  updatedAt: true,
+  Ownership: {
+    select: { id: true },
+  },
+  DispositionDecision: {
+    orderBy: [{ updatedAt: "desc" }],
+    take: 1,
+    select: {
+      targetDisposition: true,
+      updatedAt: true,
+    },
+  },
+  ConfidenceAssessment: {
+    select: {
+      horizonType: true,
+      finalScore: true,
+      confidenceBand: true,
+      isStale: true,
+    },
+  },
+},
+
+
+
+
     }),
     prisma.application.count({ where }),
   ]);
