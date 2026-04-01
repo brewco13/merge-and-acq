@@ -40,6 +40,7 @@ export default function ApplicationTable({ results }: Props) {
           <th style={{ padding: "10px 8px" }}>Disposition</th>
           <th style={{ padding: "10px 8px" }}>TSA Confidence</th>
           <th style={{ padding: "10px 8px" }}>LT Confidence</th>
+          <th style={{ padding: "10px 8px" }}>Top Gap</th>
           <th style={{ padding: "10px 8px" }}>Updated</th>
         </tr>
       </thead>
@@ -61,12 +62,26 @@ export default function ApplicationTable({ results }: Props) {
             <td style={{ padding: "10px 8px" }}>
               {app.latestTargetDisposition ?? "—"}
             </td>
-            <td style={{ padding: "10px 8px" }}>
+            <td 
+	      style={{ padding: "10px 8px" }}
+	      title={app.tsaDominantGap ?? ""}
+	    >
               {formatConfidence(app.tsaConfidence)}
             </td>
-            <td style={{ padding: "10px 8px" }}>
+
+            <td
+	      style={{ padding: "10px 8px" }}
+	      title={app.longTermDominantGap ?? ""}
+	    >
               {formatConfidence(app.longTermConfidence)}
             </td>
+
+	    <td style={{ padding: "10px 8px", maxWidth: 260 }}>
+	  	<div style={{ fontSize: 12, color: "#444" }}>
+	        {app.tsaDominantGap ?? app.longTermDominantGap ?? "—"}
+		  </div>
+	    </td>
+
             <td style={{ padding: "10px 8px" }}>
               {new Intl.DateTimeFormat("en-US", {
                 dateStyle: "medium",
@@ -78,7 +93,7 @@ export default function ApplicationTable({ results }: Props) {
 
         {results.items.length === 0 && (
           <tr>
-            <td colSpan={8} style={{ padding: "16px 8px", color: "#666" }}>
+            <td colSpan={9} style={{ padding: "16px 8px", color: "#666" }}>
               No applications match the current filters.
             </td>
           </tr>

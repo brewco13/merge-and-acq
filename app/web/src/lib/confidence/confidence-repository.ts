@@ -1,9 +1,11 @@
+
 import type { PrismaClient } from '@prisma/client';
-import {
-  selectAuthoritativeOwnership,
-} from './confidence-utils';
+import { selectAuthoritativeOwnership } from './confidence-utils';
 import type {
+  ConfidenceBand,
+  ConfidenceAssessmentStatus,
   ConfidenceContext,
+  ConfidenceHorizon,
   HorizonConfidenceResult,
   OwnershipSnapshot,
 } from './confidence-types';
@@ -100,6 +102,9 @@ export async function loadConfidenceContext(
   };
 }
 
+
+
+
 export async function upsertHorizonAssessment(
   prisma: PrismaClient,
   applicationId: string,
@@ -173,4 +178,52 @@ export async function upsertHorizonAssessment(
     ),
   );
 }
+
+export async function updateConfidenceAssessmentReview(
+  prisma: PrismaClient,
+  args: {
+    applicationId: string;
+    horizonType: ConfidenceHorizon;
+    data: {
+      manualAdjustment: number;
+      overrideReason: string | null;
+      reviewNotes: string | null;
+      assessmentStatus: ConfidenceAssessmentStatus;
+      reviewerName: string | null;
+      reviewedAt: Date | null;
+      finalScore: number;
+      confidenceBand: ConfidenceBand;
+    };
+  },
+) {
+  const { applicationId, horizonType, data } = args;
+
+  return prisma.confidenceAssessment.update({
+    where: {
+      applicationId_horizonType: {
+        applicationId,
+        horizonType,
+      },
+    },
+    data: {
+      manualAdjustment: data.manualAdjustment,
+      overrideReason: data.overrideReason,
+      reviewNotes: data.reviewNotes,
+      assessmentStatus: data.assessmentStatus,
+      reviewerName: data.reviewerName,
+      reviewedAt: data.reviewedAt,
+      finalScore: data.finalScore,
+      confidenceBand: data.confidenceBand,
+    },
+    include: {
+      ConfidenceFactorScore: true,
+    },
+  });
+}
+
+
+
+
+
+
 

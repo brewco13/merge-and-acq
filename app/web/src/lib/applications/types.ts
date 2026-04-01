@@ -46,6 +46,8 @@ export type ApplicationListItem = {
   latestTargetDisposition: DispositionType | null;
   tsaConfidence: ApplicationConfidenceSummary;
   longTermConfidence: ApplicationConfidenceSummary;
+  tsaDominantGap: string | null;
+  longTermDominantGap: string | null;
 };
 
 export type PaginatedApplicationResults = {

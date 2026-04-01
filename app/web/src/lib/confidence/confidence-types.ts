@@ -1,3 +1,7 @@
+import type { MAX_CONFIDENCE_SCORE, MIN_CONFIDENCE_SCORE, 
+	      MANUAL_ADJUSTMENT_MIN, MANUAL_ADJUSTMENT_MAX
+             } from './confidence-rules';
+
 export type ConfidenceHorizon = 'TSA' | 'LONG_TERM';
 
 export type ConfidenceBand = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -121,4 +125,22 @@ export interface ConfidenceContext {
   notes: NoteSnapshot[];
   candidateApplications: CandidateApplicationSnapshot[];
   existingAssessments: ExistingAssessmentSnapshot[];
+}
+export interface ConfidenceReviewUpdateInput {
+  manualAdjustment?: number;
+  overrideReason?: string | null;
+  reviewNotes?: string | null;
+  assessmentStatus?: ConfidenceAssessmentStatus;
+  reviewerName?: string | null;
+}
+
+export interface ConfidenceReviewPersistInput {
+  manualAdjustment: number;
+  overrideReason: string | null;
+  reviewNotes: string | null;
+  assessmentStatus: ConfidenceAssessmentStatus;
+  reviewerName: string | null;
+  reviewedAt: Date | null;
+  finalScore: number;
+  confidenceBand: ConfidenceBand;
 }

@@ -1,9 +1,10 @@
 import {
   CONFIDENCE_BANDS,
-  MANUAL_ADJUSTMENT_MAX,
-  MANUAL_ADJUSTMENT_MIN,
   STALE_DAYS_THRESHOLD,
+  clampConfidenceScore,
+  clampManualAdjustment,
 } from './confidence-rules';
+
 import type {
   ConfidenceBand,
   ConfidenceHorizon,
@@ -11,6 +12,23 @@ import type {
   OwnershipSnapshot,
 } from './confidence-types';
 
+export function normalizeManualAdjustment(
+  value: number | null | undefined,
+): number {
+  if (value == null || Number.isNaN(value)) {
+    return 0;
+  }
+
+  return Math.round(clampManualAdjustment(value));
+}
+
+export function computeFinalConfidenceScore(
+  calculatedScore: number,
+  manualAdjustment: number | null | undefined,
+): number {
+  const normalizedAdjustment = normalizeManualAdjustment(manualAdjustment);
+  return Math.round(clampConfidenceScore(calculatedScore + normalizedAdjustment));
+}
 export function clampScore(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -19,9 +37,11 @@ export function roundScore(value: number): number {
   return Math.round(value);
 }
 
+/*
 export function clampManualAdjustment(value: number): number {
   return Math.max(MANUAL_ADJUSTMENT_MIN, Math.min(MANUAL_ADJUSTMENT_MAX, value));
 }
+*/
 
 export function deriveConfidenceBand(score: number): ConfidenceBand {
   const safeScore = clampScore(score);

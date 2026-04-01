@@ -4,8 +4,22 @@ export const CONFIDENCE_MODEL_VERSION = 'v1.0';
 
 export const MANUAL_ADJUSTMENT_MIN = -20;
 export const MANUAL_ADJUSTMENT_MAX = 20;
+export const MIN_CONFIDENCE_SCORE = 0;
+export const MAX_CONFIDENCE_SCORE = 100;
 
 export const STALE_DAYS_THRESHOLD = 90;
+
+
+
+export function clampConfidenceScore(value: number): number {
+  return Math.min(MAX_CONFIDENCE_SCORE, Math.max(MIN_CONFIDENCE_SCORE, value));
+}
+
+export function clampManualAdjustment(value: number): number {
+  return Math.min(MANUAL_ADJUSTMENT_MAX, Math.max(-MANUAL_ADJUSTMENT_MIN, value));
+}
+
+
 
 export const FACTOR_ORDER: ConfidenceFactorCode[] = [
   'DISPOSITION_DEFINITION',
@@ -25,10 +39,7 @@ export const TSA_FACTOR_WEIGHTS: Record<ConfidenceFactorCode, number> = {
   STABILITY_CONSISTENCY: 5,
 };
 
-export const LONG_TERM_FACTOR_WEIGHTS: Record<ConfidenceFactorCode, number> = {
-  DISPOSITION_DEFINITION: 15,
-  EVIDENCE_QUALITY: 20,
-  BUSINESS_ALIGNMENT: 20,
+export const LONG_TERM_FACTOR_WEIGHTS: Record<ConfidenceFactorCode, number> = { DISPOSITION_DEFINITION: 15, EVIDENCE_QUALITY: 20, BUSINESS_ALIGNMENT: 20,
   TECHNICAL_ALIGNMENT: 25,
   EXECUTION_READINESS: 10,
   STABILITY_CONSISTENCY: 10,

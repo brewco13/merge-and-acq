@@ -104,6 +104,28 @@ export function buildApplicationOrderBy(
   }
 }
 
+function deriveDominantGap(assessment: {
+  ConfidenceFactorScore: Array<{
+    factorCode: string;
+    weightedScore: Prisma.Decimal;
+    explanation: string | null;
+  }>;
+} | undefined): string | null {
+  if (!assessment || assessment.ConfidenceFactorScore.length === 0) {
+    return null;
+  }
+
+  const weakestFactor = [...assessment.ConfidenceFactorScore].sort(
+    (a, b) => a.weightedScore.toNumber() - b.weightedScore.toNumber()
+  )[0];
+
+  if (!weakestFactor) {
+    return null;
+  }
+
+  return weakestFactor.explanation ?? weakestFactor.factorCode;
+}
+
 function mapApplicationRow(row: {
   id: string;
   legacyId: string | null;
@@ -121,6 +143,11 @@ function mapApplicationRow(row: {
     finalScore: number;
     confidenceBand: "LOW" | "MEDIUM" | "HIGH";
     isStale: boolean;
+    ConfidenceFactorScore: Array< {
+	    factorCode: string;
+	    weightedScore: Prisma.Decimal;
+	    explanation: string | null;
+    }>;
   }>;
 }): ApplicationListItem {
   const latestDisposition =
@@ -132,32 +159,37 @@ function mapApplicationRow(row: {
   const longTerm = row.ConfidenceAssessment.find(
     (c) => c.horizonType === "LONG_TERM"
   );
-
-  return {
-    id: row.id,
-    legacyId: row.legacyId,
-    name: row.name,
-    businessArea: row.businessArea,
-    description: row.description,
-    updatedAt: row.updatedAt,
-    ownershipCount: row.Ownership.length,
-    latestTargetDisposition: latestDisposition,
-    tsaConfidence: tsa
-      ? {
-          finalScore: tsa.finalScore,
-          confidenceBand: tsa.confidenceBand,
-          isStale: tsa.isStale,
-        }
-      : null,
-    longTermConfidence: longTerm
-      ? {
-          finalScore: longTerm.finalScore,
-          confidenceBand: longTerm.confidenceBand,
-          isStale: longTerm.isStale,
-        }
-      : null,
-  };
+  const tsaDominantGap = deriveDominantGap(tsa);
+  const longTermDominantGap = deriveDominantGap(longTerm);
+return {
+  id: row.id,
+  legacyId: row.legacyId,
+  name: row.name,
+  businessArea: row.businessArea,
+  description: row.description,
+  updatedAt: row.updatedAt,
+  ownershipCount: row.Ownership.length,
+  latestTargetDisposition: latestDisposition,
+  tsaConfidence: tsa
+    ? {
+        finalScore: tsa.finalScore,
+        confidenceBand: tsa.confidenceBand,
+        isStale: tsa.isStale,
+      }
+    : null,
+  longTermConfidence: longTerm
+    ? {
+        finalScore: longTerm.finalScore,
+        confidenceBand: longTerm.confidenceBand,
+        isStale: longTerm.isStale,
+      }
+    : null,
+  tsaDominantGap,
+  longTermDominantGap,
 }
+};
+
+
 
 
 function sortApplicationItems(
@@ -228,6 +260,13 @@ export async function getApplications(
             finalScore: true,
             confidenceBand: true,
             isStale: true,
+	    ConfidenceFactorScore: {
+		    select: {
+			    factorCode: true,
+			    weightedScore: true,
+			    explanation: true,
+		    },
+	    },
           },
         },
       },
