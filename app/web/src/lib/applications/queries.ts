@@ -159,6 +159,7 @@ function mapApplicationRow(row: {
   };
 }
 
+
 function sortApplicationItems(
   items: ApplicationListItem[],
   sort: ApplicationListSort
@@ -188,6 +189,7 @@ function sortApplicationItems(
       return sorted;
   }
 }
+
 
 export async function getApplications(
   filters: ApplicationListFilters
@@ -244,6 +246,7 @@ export async function getApplications(
     totalPages,
   };
 }
+
 
 export async function getApplicationFilterOptions(): Promise<FilterOptionsResponse> {
   const [businessAreaRows, dispositionRows] = await Promise.all([
