@@ -1,5 +1,7 @@
 import Link from "next/link";
-import type { PaginatedApplicationResults } from "@/lib/applications/types";
+import type { 	ApplicationConfidenceSummary,
+	      	PaginatedApplicationResults,
+  	    } from "@/lib/applications/types";
 
 type Props = {
   results: PaginatedApplicationResults;

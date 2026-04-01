@@ -1,11 +1,62 @@
+import type { 	ApplicationListFilters, 
+		ApplicationListSort,
+		ConfidenceBandFilter, 
+	    } from "./types";
 import type { DispositionType } from "@prisma/client";
-import type { ApplicationListFilters, ApplicationListSort } from "./types";
+
+export function parseApplicationFilters(
+  searchParams: Record<string, string | string[] | undefined>
+): ApplicationListFilters {
+  const rawSearch = getSingleValue(searchParams.search)?.trim();
+  const rawBusinessArea = getSingleValue(searchParams.businessArea)?.trim();
+  const rawTargetDisposition = getSingleValue(searchParams.targetDisposition)?.trim();
+  const rawSort = getSingleValue(searchParams.sort);
+
+  const sort: ApplicationListSort = ALLOWED_SORTS.includes(
+    rawSort as ApplicationListSort
+  )
+    ? (rawSort as ApplicationListSort)
+    : "name_asc";
+
+  const targetDisposition = ALLOWED_TARGET_DISPOSITIONS.includes(
+    rawTargetDisposition as DispositionType
+  )
+    ? (rawTargetDisposition as DispositionType)
+    : undefined;
+
+  return {
+  search: rawSearch || undefined,
+  businessArea: rawBusinessArea || undefined,
+  targetDisposition,
+
+  tsaConfidenceBand:
+    typeof searchParams.tsaConfidenceBand === "string"
+      ? (searchParams.tsaConfidenceBand as ConfidenceBandFilter)
+      : undefined,
+
+  longTermConfidenceBand:
+    typeof searchParams.longTermConfidenceBand === "string"
+      ? (searchParams.longTermConfidenceBand as ConfidenceBandFilter)
+      : undefined,
+
+  staleOnly:
+    getSingleValue(searchParams.staleOnly) === "true",
+
+  sort,
+  page: parsePositiveInt(getSingleValue(searchParams.page), 1),
+  pageSize: parsePositiveInt(getSingleValue(searchParams.pageSize), 25, 100),
+}
+};
 
 const ALLOWED_SORTS: ApplicationListSort[] = [
   "name_asc",
   "name_desc",
   "businessArea_asc",
   "updated_desc",
+  "tsaConfidence_asc",
+  "tsaConfidence_desc",
+  "longTermConfidence_asc",
+  "longTermConfidence_desc",
 ];
 
 const ALLOWED_TARGET_DISPOSITIONS: DispositionType[] = [
@@ -17,6 +68,10 @@ const ALLOWED_TARGET_DISPOSITIONS: DispositionType[] = [
   "REPURCHASE",
   "CONSOLIDATE",
 ];
+
+
+
+
 
 function getSingleValue(
   value: string | string[] | undefined
@@ -42,32 +97,3 @@ function parsePositiveInt(
   return parsed;
 }
 
-export function parseApplicationFilters(
-  searchParams: Record<string, string | string[] | undefined>
-): ApplicationListFilters {
-  const rawSearch = getSingleValue(searchParams.search)?.trim();
-  const rawBusinessArea = getSingleValue(searchParams.businessArea)?.trim();
-  const rawTargetDisposition = getSingleValue(searchParams.targetDisposition)?.trim();
-  const rawSort = getSingleValue(searchParams.sort);
-
-  const sort: ApplicationListSort = ALLOWED_SORTS.includes(
-    rawSort as ApplicationListSort
-  )
-    ? (rawSort as ApplicationListSort)
-    : "name_asc";
-
-  const targetDisposition = ALLOWED_TARGET_DISPOSITIONS.includes(
-    rawTargetDisposition as DispositionType
-  )
-    ? (rawTargetDisposition as DispositionType)
-    : undefined;
-
-  return {
-    search: rawSearch || undefined,
-    businessArea: rawBusinessArea || undefined,
-    targetDisposition,
-    sort,
-    page: parsePositiveInt(getSingleValue(searchParams.page), 1),
-    pageSize: parsePositiveInt(getSingleValue(searchParams.pageSize), 25, 100),
-  };
-}

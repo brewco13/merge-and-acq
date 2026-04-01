@@ -40,12 +40,43 @@ export default function ApplicationListToolbar({
         ))}
       </select>
 
+      <select name="tsaConfidenceBand" defaultValue={filters.tsaConfidenceBand ?? ""}>
+        <option value="">All TSA Confidence</option>
+        <option value="LOW">TSA Low</option>
+        <option value="MEDIUM">TSA Medium</option>
+        <option value="HIGH">TSA High</option>
+      </select>
+
+      <select
+        name="longTermConfidenceBand"
+        defaultValue={filters.longTermConfidenceBand ?? ""}
+      >
+        <option value="">All LT Confidence</option>
+        <option value="LOW">LT Low</option>
+        <option value="MEDIUM">LT Medium</option>
+        <option value="HIGH">LT High</option>
+      </select>
+
       <select name="sort" defaultValue={filters.sort}>
         <option value="name_asc">Name A-Z</option>
         <option value="name_desc">Name Z-A</option>
         <option value="businessArea_asc">Business Area</option>
         <option value="updated_desc">Recently Updated</option>
+        <option value="tsaConfidence_asc">Lowest TSA Confidence</option>
+        <option value="tsaConfidence_desc">Highest TSA Confidence</option>
+        <option value="longTermConfidence_asc">Lowest LT Confidence</option>
+        <option value="longTermConfidence_desc">Highest LT Confidence</option>
       </select>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          type="checkbox"
+          name="staleOnly"
+          value="true"
+          defaultChecked={filters.staleOnly ?? false}
+        />
+        Stale only
+      </label>
 
       <button type="submit">Apply</button>
       <Link href="/applications">Clear</Link>

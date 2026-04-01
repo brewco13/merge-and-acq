@@ -44,6 +44,38 @@ export function buildApplicationWhere(
     });
   }
 
+  if (filters.tsaConfidenceBand) {
+    and.push({
+      ConfidenceAssessment: {
+        some: {
+          horizonType: "TSA",
+          confidenceBand: filters.tsaConfidenceBand,
+        },
+      },
+    });
+  }
+
+  if (filters.longTermConfidenceBand) {
+    and.push({
+      ConfidenceAssessment: {
+        some: {
+          horizonType: "LONG_TERM",
+          confidenceBand: filters.longTermConfidenceBand,
+        },
+      },
+    });
+  }
+
+  if (filters.staleOnly) {
+    and.push({
+      ConfidenceAssessment: {
+        some: {
+          isStale: true,
+        },
+      },
+    });
+  }
+
   return and.length > 0 ? { AND: and } : {};
 }
 
@@ -60,12 +92,17 @@ export function buildApplicationOrderBy(
     case "updated_desc":
       return [{ updatedAt: "desc" }, { name: "asc" }];
 
+    case "tsaConfidence_asc":
+    case "tsaConfidence_desc":
+    case "longTermConfidence_asc":
+    case "longTermConfidence_desc":
+      return [{ name: "asc" }];
+
     case "name_asc":
     default:
       return [{ name: "asc" }];
   }
 }
-
 
 function mapApplicationRow(row: {
   id: string;
@@ -91,10 +128,7 @@ function mapApplicationRow(row: {
       ? row.DispositionDecision[0].targetDisposition
       : null;
 
-  const tsa = row.ConfidenceAssessment.find(
-    (c) => c.horizonType === "TSA"
-  );
-
+  const tsa = row.ConfidenceAssessment.find((c) => c.horizonType === "TSA");
   const longTerm = row.ConfidenceAssessment.find(
     (c) => c.horizonType === "LONG_TERM"
   );
@@ -125,6 +159,36 @@ function mapApplicationRow(row: {
   };
 }
 
+function sortApplicationItems(
+  items: ApplicationListItem[],
+  sort: ApplicationListSort
+): ApplicationListItem[] {
+  const sorted = [...items];
+
+  const tsaScore = (item: ApplicationListItem) =>
+    item.tsaConfidence?.finalScore ?? -1;
+
+  const ltScore = (item: ApplicationListItem) =>
+    item.longTermConfidence?.finalScore ?? -1;
+
+  switch (sort) {
+    case "tsaConfidence_asc":
+      return sorted.sort((a, b) => tsaScore(a) - tsaScore(b));
+
+    case "tsaConfidence_desc":
+      return sorted.sort((a, b) => tsaScore(b) - tsaScore(a));
+
+    case "longTermConfidence_asc":
+      return sorted.sort((a, b) => ltScore(a) - ltScore(b));
+
+    case "longTermConfidence_desc":
+      return sorted.sort((a, b) => ltScore(b) - ltScore(a));
+
+    default:
+      return sorted;
+  }
+}
+
 export async function getApplications(
   filters: ApplicationListFilters
 ): Promise<PaginatedApplicationResults> {
@@ -138,43 +202,38 @@ export async function getApplications(
       orderBy,
       skip,
       take: filters.pageSize,
-
-
-
-select: {
-  id: true,
-  legacyId: true,
-  name: true,
-  businessArea: true,
-  description: true,
-  updatedAt: true,
-  Ownership: {
-    select: { id: true },
-  },
-  DispositionDecision: {
-    orderBy: [{ updatedAt: "desc" }],
-    take: 1,
-    select: {
-      targetDisposition: true,
-      updatedAt: true,
-    },
-  },
-  ConfidenceAssessment: {
-    select: {
-      horizonType: true,
-      finalScore: true,
-      confidenceBand: true,
-      isStale: true,
-    },
-  },
-},
-
-
+      select: {
+        id: true,
+        legacyId: true,
+        name: true,
+        businessArea: true,
+        description: true,
+        updatedAt: true,
+        Ownership: {
+          select: { id: true },
+        },
+        DispositionDecision: {
+          orderBy: [{ updatedAt: "desc" }],
+          take: 1,
+          select: {
+            targetDisposition: true,
+            updatedAt: true,
+          },
+        },
+        ConfidenceAssessment: {
+          select: {
+            horizonType: true,
+            finalScore: true,
+            confidenceBand: true,
+            isStale: true,
+          },
+        },
+      },
     }),
     prisma.application.count({ where }),
   ]);
 
-  const items = rows.map(mapApplicationRow);
+  const items = sortApplicationItems(rows.map(mapApplicationRow), filters.sort);
   const totalPages = Math.max(1, Math.ceil(total / filters.pageSize));
 
   return {

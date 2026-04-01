@@ -4,12 +4,21 @@ export type ApplicationListSort =
   | "name_asc"
   | "name_desc"
   | "businessArea_asc"
-  | "updated_desc";
+  | "updated_desc"
+  | "tsaConfidence_asc"
+  | "tsaConfidence_desc"
+  | "longTermConfidence_asc"
+  | "longTermConfidence_desc";
 
-export type ApplicationListFilters = {
+export type ConfidenceBandFilter = "LOW" | "MEDIUM" | "HIGH";
+
+ export type ApplicationListFilters = {
   search?: string;
   businessArea?: string;
   targetDisposition?: DispositionType;
+  tsaConfidenceBand?: ConfidenceBandFilter;
+  longTermConfidenceBand?: ConfidenceBandFilter;
+  staleOnly?: boolean;
   sort: ApplicationListSort;
   page: number;
   pageSize: number;
