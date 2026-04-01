@@ -170,8 +170,6 @@ select: {
 },
 
 
-
-
     }),
     prisma.application.count({ where }),
   ]);
