@@ -30,6 +30,8 @@ npm run dev
 App runs at:
 http://localhost:3000--
 
+docker compose -p mergeandacq-dev -f docker-compose.dev.yml up -d --build
+
 ## Production Deployment (Synology)
 
 git pull
