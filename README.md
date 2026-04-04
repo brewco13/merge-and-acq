@@ -22,6 +22,92 @@ The tool is designed to move merger analysis out of spreadsheets and into a stru
 - PostgreSQL + Prisma backend
 - Docker-based deployment--
 
+
+
+## Dev Startup (Local Development)
+Overview
+
+Dev environment consists of:
+
+PostgreSQL (Docker)
+Next.js app (local Node process)
+🚀 Step-by-Step
+1. Start Postgres (Docker)
+
+From repo root:
+
+docker compose -f infra/compose/docker-compose.dev.yml up -d db
+
+👉 Starts only the database container
+
+2. Verify database is running
+docker ps
+
+You should see something like:
+
+merge-and-acq-db
+3. Ensure environment file exists
+
+File:
+
+app/web/.env
+
+Example:
+
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merge_and_acq"
+4. Start the app
+cd app/web
+npm run dev
+5. Open in browser
+http://localhost:3000
+⚠️ Common Issues
+Docker not running
+
+Error:
+
+failed to connect to docker API
+
+Fix:
+
+Start Docker Desktop
+Port already in use
+
+Run on different port:
+
+PORT=3008 npm run dev
+Prisma / DATABASE_URL errors
+Ensure .env exists in app/web
+Ensure DATABASE_URL is valid
+Don’t use --build for normal dev
+docker compose ... up -d
+
+✔ correct for dev
+❌ --build will try to build the web container and may fail
+
+🧠 Dev vs Prod (quick mental model)
+Component	Dev	Prod
+App	npm run dev	Docker
+DB	Docker	Docker
+Env file	.env	.env.prod
+Build step	none	required
+✅ Recommendation
+
+Add this as a section in your README.md:
+
+## Local Development
+🔥 Optional (but very useful)
+
+Also add to your canvas:
+
+👉 Dev Startup Checklist
+
+So future-you doesn’t have to rediscover this after every reboot.
+
+
+
+
+
+
 ## Local Development
 
 cd app/web
@@ -31,6 +117,7 @@ App runs at:
 http://localhost:3000--
 
 docker compose -p mergeandacq-dev -f docker-compose.dev.yml up -d --build
+docker compose --env-file .env.dev -p mergeandacq-dev -f docker-compose.dev.yml up -d --build
 
 ## Production Deployment (Synology)
 
