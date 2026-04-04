@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+
 type ConfidenceFactor = {
   factorCode: string;
   rawScore: number;
@@ -55,24 +59,21 @@ function formatDate(value: string | Date | null) {
   return date.toLocaleString();
 }
 
-
 function uniqueStrings(values: string[]) {
   return [...new Set(values.map((v) => v.trim()).filter(Boolean))];
 }
 
 function summarizeSignals(horizon: HorizonConfidence) {
   const helping = uniqueStrings(
-    horizon.factorScores.flatMap((factor) => factor.helpingSignals ?? [])
+    horizon.factorScores.flatMap((factor) => factor.helpingSignals ?? []),
   ).slice(0, 5);
 
   const lowering = uniqueStrings(
-    horizon.factorScores.flatMap((factor) => factor.loweringSignals ?? [])
+    horizon.factorScores.flatMap((factor) => factor.loweringSignals ?? []),
   ).slice(0, 5);
 
   return { helping, lowering };
 }
-
-
 
 function FactorBreakdown({ factors }: { factors: ConfidenceFactor[] }) {
   return (
@@ -83,9 +84,7 @@ function FactorBreakdown({ factors }: { factors: ConfidenceFactor[] }) {
             <div className="text-sm font-medium">
               {factor.factorCode.replaceAll('_', ' ')}
             </div>
-            <div className="text-sm text-gray-600">
-              {factor.rawScore}/100
-            </div>
+            <div className="text-sm text-gray-600">{factor.rawScore}/100</div>
           </div>
 
           <div className="mb-2 h-2 w-full rounded bg-gray-100">
@@ -134,8 +133,61 @@ function FactorBreakdown({ factors }: { factors: ConfidenceFactor[] }) {
   );
 }
 
-function HorizonCard({ horizon }: { horizon: HorizonConfidence }) {
-     const summary = summarizeSignals(horizon);
+function HorizonCard({
+  horizon,
+  applicationId,
+}: {
+  horizon: HorizonConfidence;
+  applicationId: string;
+}) {
+  const [manualAdjustment, setManualAdjustment] = useState(horizon.manualAdjustment ?? 0);
+  const [overrideReason, setOverrideReason] = useState(horizon.overrideReason ?? '');
+  const [reviewNotes, setReviewNotes] = useState(horizon.reviewNotes ?? '');
+  const [assessmentStatus, setAssessmentStatus] = useState(horizon.assessmentStatus);
+  const [reviewerName, setReviewerName] = useState(horizon.reviewerName ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const previewFinal = Math.max(
+    0,
+    Math.min(100, horizon.calculatedScore + manualAdjustment),
+  );
+
+  const summary = summarizeSignals(horizon);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const res = await fetch(
+        `/api/applications/${applicationId}/confidence/${horizon.horizonType}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            manualAdjustment,
+            overrideReason: overrideReason.trim() || null,
+            reviewNotes: reviewNotes.trim() || null,
+            assessmentStatus,
+            reviewerName: reviewerName.trim() || null,
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || 'Failed to save');
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Failed to save');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="rounded-xl border bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -175,9 +227,10 @@ function HorizonCard({ horizon }: { horizon: HorizonConfidence }) {
 
         <div className="rounded-lg bg-gray-50 p-3">
           <div className="text-gray-500">Stale</div>
-	  <div className="font-medium text-gray-900">{horizon.isStale ? 'Yes (not reviewed)' : 'No'} </div>
+          <div className="font-medium text-gray-900">
+            {horizon.isStale ? 'Yes (not reviewed)' : 'No'}
+          </div>
         </div>
-
 
         <div className="rounded-lg bg-gray-50 p-3">
           <div className="text-gray-500">Calculated at</div>
@@ -214,6 +267,7 @@ function HorizonCard({ horizon }: { horizon: HorizonConfidence }) {
           ) : null}
         </div>
       )}
+
       {(summary.helping.length > 0 || summary.lowering.length > 0) && (
         <div className="mb-4 rounded-lg border bg-gray-50 p-3">
           <div className="mb-2 text-sm font-semibold text-gray-900">
@@ -247,7 +301,78 @@ function HorizonCard({ horizon }: { horizon: HorizonConfidence }) {
           )}
         </div>
       )}
+
       <FactorBreakdown factors={horizon.factorScores} />
+
+      <div className="mt-4 border-t pt-4">
+        <h4 className="mb-2 text-sm font-semibold">Manual Review</h4>
+
+        <div className="mb-2 text-sm">
+          <div>Calculated: {horizon.calculatedScore}</div>
+          <div>Preview Final: {previewFinal}</div>
+        </div>
+
+        <div className="mb-2 flex items-center gap-2">
+          <label>Adjustment</label>
+          <input
+            type="number"
+            min={-15}
+            max={15}
+            step={1}
+            value={manualAdjustment}
+            onChange={(e) => setManualAdjustment(Number(e.target.value))}
+            className="w-20 border px-2 py-1"
+          />
+        </div>
+
+        <input
+          type="text"
+          placeholder="Override reason"
+          value={overrideReason}
+          onChange={(e) => setOverrideReason(e.target.value)}
+          className="mb-2 w-full border px-2 py-1"
+        />
+
+        <textarea
+          placeholder="Review notes"
+          value={reviewNotes}
+          onChange={(e) => setReviewNotes(e.target.value)}
+          className="mb-2 w-full border px-2 py-1"
+        />
+
+        <select
+          value={assessmentStatus}
+          onChange={(e) =>
+            setAssessmentStatus(
+              e.target.value as 'SYSTEM_CALCULATED' | 'REVIEWED' | 'APPROVED' | 'OVERRIDDEN',
+            )
+          }
+          className="mb-2 border px-2 py-1"
+        >
+          <option value="SYSTEM_CALCULATED">System</option>
+          <option value="REVIEWED">Reviewed</option>
+          <option value="APPROVED">Approved</option>
+          <option value="OVERRIDDEN">Overridden</option>
+        </select>
+
+        <input
+          type="text"
+          placeholder="Reviewer"
+          value={reviewerName}
+          onChange={(e) => setReviewerName(e.target.value)}
+          className="mb-2 w-full border px-2 py-1"
+        />
+
+        {saveError ? <div className="mb-2 text-sm text-red-600">{saveError}</div> : null}
+
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-50"
+        >
+          {isSaving ? 'Saving...' : 'Save Review'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -282,8 +407,14 @@ export function ConfidenceSection({
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <HorizonCard horizon={confidence.tsa} />
-        <HorizonCard horizon={confidence.longTerm} />
+        <HorizonCard
+          horizon={confidence.tsa}
+          applicationId={confidence.applicationId}
+        />
+        <HorizonCard
+          horizon={confidence.longTerm}
+          applicationId={confidence.applicationId}
+        />
       </div>
     </section>
   );

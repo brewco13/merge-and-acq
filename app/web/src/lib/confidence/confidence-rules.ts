@@ -2,8 +2,8 @@ import type { ConfidenceBand, ConfidenceFactorCode } from './confidence-types';
 
 export const CONFIDENCE_MODEL_VERSION = 'v1.0';
 
-export const MANUAL_ADJUSTMENT_MIN = -20;
-export const MANUAL_ADJUSTMENT_MAX = 20;
+export const MANUAL_ADJUSTMENT_MAX = 15;
+export const MANUAL_ADJUSTMENT_MIN = -15;
 export const MIN_CONFIDENCE_SCORE = 0;
 export const MAX_CONFIDENCE_SCORE = 100;
 
@@ -16,10 +16,8 @@ export function clampConfidenceScore(value: number): number {
 }
 
 export function clampManualAdjustment(value: number): number {
-  return Math.min(MANUAL_ADJUSTMENT_MAX, Math.max(-MANUAL_ADJUSTMENT_MIN, value));
+  return Math.min(MANUAL_ADJUSTMENT_MAX, Math.max(MANUAL_ADJUSTMENT_MIN, value));
 }
-
-
 
 export const FACTOR_ORDER: ConfidenceFactorCode[] = [
   'DISPOSITION_DEFINITION',

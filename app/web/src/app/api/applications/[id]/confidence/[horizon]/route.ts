@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -7,6 +6,7 @@ import {
   deriveConfidenceBand,
   normalizeManualAdjustment,
 } from '@/lib/confidence/confidence-utils';
+
 import { updateConfidenceAssessmentReview } from '@/lib/confidence/confidence-repository';
 import { prisma } from '@/lib/prisma';
 
@@ -47,9 +47,6 @@ export async function PATCH(
           applicationId: parsedParams.id,
           horizonType,
         },
-      },
-      include: {
-        ConfidenceFactorScore: true,
       },
     });
 
@@ -103,21 +100,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({
-      applicationId: updated.applicationId,
-      horizonType: updated.horizonType,
-      calculatedScore: updated.calculatedScore,
-      manualAdjustment: updated.manualAdjustment,
-      finalScore: updated.finalScore,
-      confidenceBand: updated.confidenceBand,
-      assessmentStatus: updated.assessmentStatus,
-      reviewerName: updated.reviewerName,
-      reviewNotes: updated.reviewNotes,
-      overrideReason: updated.overrideReason,
-      reviewedAt: updated.reviewedAt,
-      calculatedAt: updated.calculatedAt,
-      isStale: updated.isStale,
-    });
+    return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
