@@ -7,6 +7,102 @@ type Props = {
   results: PaginatedApplicationResults;
 };
 
+
+
+
+function renderConfidence(confidence: any) {
+  if (!confidence) return <span style={{ color: "#999" }}>—</span>;
+
+  const {
+    finalScore,
+    confidenceBand,
+    isStale,
+    assessmentStatus,
+    manualAdjustment,
+  } = confidence;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {/* Top row */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <span style={{ fontWeight: 600 }}>{finalScore}</span>
+
+        <span
+          style={{
+            fontSize: 11,
+            padding: "2px 6px",
+            borderRadius: 999,
+            border: "1px solid #ddd",
+          }}
+        >
+          {confidenceBand}
+        </span>
+
+        {isStale && (
+          <span
+            style={{
+              fontSize: 11,
+              padding: "2px 6px",
+              borderRadius: 999,
+              background: "#fef3c7",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+            }}
+          >
+            Stale
+          </span>
+        )}
+      </div>
+
+      {/* Bottom row */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        <span
+          style={{
+            fontSize: 11,
+            padding: "2px 6px",
+            borderRadius: 999,
+            border: "1px solid #ddd",
+          }}
+        >
+          {formatStatus(assessmentStatus)}
+        </span>
+
+        {manualAdjustment !== 0 && (
+          <span
+            style={{
+              fontSize: 11,
+              padding: "2px 6px",
+              borderRadius: 999,
+              background: "#fef3c7",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+            }}
+          >
+            Adjusted {manualAdjustment > 0 ? "+" : ""}
+            {manualAdjustment}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatStatus(status: string | null) {
+  switch (status) {
+    case "SYSTEM_CALCULATED":
+      return "System";
+    case "REVIEWED":
+      return "Reviewed";
+    case "APPROVED":
+      return "Approved";
+    case "OVERRIDDEN":
+      return "Overridden";
+    default:
+      return "—";
+  }
+}
+
+// get rid of formatConfidence!! BP
 function formatConfidence(
   confidence:
     | {
@@ -66,14 +162,14 @@ export default function ApplicationTable({ results }: Props) {
 	      style={{ padding: "10px 8px" }}
 	      title={app.tsaDominantGap ?? ""}
 	    >
-              {formatConfidence(app.tsaConfidence)}
+	      {renderConfidence(app.tsaConfidence)}
             </td>
 
             <td
 	      style={{ padding: "10px 8px" }}
 	      title={app.longTermDominantGap ?? ""}
 	    >
-              {formatConfidence(app.longTermConfidence)}
+	      {renderConfidence(app.longTermConfidence)}
             </td>
 
 	    <td style={{ padding: "10px 8px", maxWidth: 260 }}>

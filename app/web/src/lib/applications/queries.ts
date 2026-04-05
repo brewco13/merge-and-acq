@@ -170,11 +170,15 @@ return {
   updatedAt: row.updatedAt,
   ownershipCount: row.Ownership.length,
   latestTargetDisposition: latestDisposition,
+
+
   tsaConfidence: tsa
     ? {
         finalScore: tsa.finalScore,
         confidenceBand: tsa.confidenceBand,
         isStale: tsa.isStale,
+        assessmentStatus: tsa.assessmentStatus,
+        manualAdjustment: tsa.manualAdjustment,
       }
     : null,
   longTermConfidence: longTerm
@@ -182,6 +186,8 @@ return {
         finalScore: longTerm.finalScore,
         confidenceBand: longTerm.confidenceBand,
         isStale: longTerm.isStale,
+        assessmentStatus: longTerm.assessmentStatus,
+        manualAdjustment: longTerm.manualAdjustment,
       }
     : null,
   tsaDominantGap,
@@ -254,12 +260,16 @@ export async function getApplications(
             updatedAt: true,
           },
         },
+
+
         ConfidenceAssessment: {
           select: {
             horizonType: true,
             finalScore: true,
             confidenceBand: true,
             isStale: true,
+            assessmentStatus: true,
+            manualAdjustment: true,
 	    ConfidenceFactorScore: {
 		    select: {
 			    factorCode: true,

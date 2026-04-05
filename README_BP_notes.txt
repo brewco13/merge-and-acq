@@ -1,4 +1,24 @@
 
+
+
+🎯 Result planned colors	
+
+OVERRIDDEN
+amber background tint
+amber top bar
+
+APPROVED
+green tint
+green top bar
+
+REVIEWED
+blue tint
+blue top bar
+
+SYSTEM_CALCULATED
+no bar (clean)
+
+
 TEst 1
 
 curl -X PATCH "http://localhost:3000/api/applications/4c69bc6b-71ba-4dea-8bb0-1185972e1d6e/confidence/TSA" -H "Content-Type: application/json" -d "{\"manualAdjustment\":5,\"overrideReason\":\"Confirmed with stakeholders\",\"reviewNotes\":\"Good supporting evidence\",\"assessmentStatus\":\"OVERRIDDEN\",\"reviewerName\":\"Brian\"}"
