@@ -62,7 +62,20 @@ function formatDate(value: string | Date | null) {
 function uniqueStrings(values: string[]) {
   return [...new Set(values.map((v) => v.trim()).filter(Boolean))];
 }
-
+function formatAssessmentStatus(
+  status: 'SYSTEM_CALCULATED' | 'REVIEWED' | 'APPROVED' | 'OVERRIDDEN',
+) {
+  switch (status) {
+    case 'SYSTEM_CALCULATED':
+      return 'System calculated';
+    case 'REVIEWED':
+      return 'Reviewed';
+    case 'APPROVED':
+      return 'Approved';
+    case 'OVERRIDDEN':
+      return 'Overridden';
+  }
+}
 function summarizeSignals(horizon: HorizonConfidence) {
   const helping = uniqueStrings(
     horizon.factorScores.flatMap((factor) => factor.helpingSignals ?? []),
@@ -155,50 +168,76 @@ function HorizonCard({
 
   const summary = summarizeSignals(horizon);
 
-  async function handleSave() {
-    setIsSaving(true);
-    setSaveError(null);
 
-    try {
-      const res = await fetch(
-        `/api/applications/${applicationId}/confidence/${horizon.horizonType}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            manualAdjustment,
-            overrideReason: overrideReason.trim() || null,
-            reviewNotes: reviewNotes.trim() || null,
-            assessmentStatus,
-            reviewerName: reviewerName.trim() || null,
-          }),
-        },
-      );
+async function handleSave() {
+  setIsSaving(true);
+  setSaveError(null);
 
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        throw new Error(payload?.error || 'Failed to save');
-      }
+  try {
+    const res = await fetch(
+      `/api/applications/${applicationId}/confidence/${horizon.horizonType}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          manualAdjustment,
+          overrideReason: overrideReason.trim() || null,
+          reviewNotes: reviewNotes.trim() || null,
+          assessmentStatus,
+          reviewerName: reviewerName.trim() || null,
+        }),
+      },
+    );
 
-      window.location.reload();
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Failed to save');
-    } finally {
-      setIsSaving(false);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.error || 'Failed to save');
     }
+
+    window.location.reload();
+  } catch (error) {
+    setSaveError(error instanceof Error ? error.message : 'Failed to save');
+  } finally {
+    setIsSaving(false);
   }
+}
+
+
 
   return (
     <div className="rounded-xl border bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-medium text-gray-500">
-            {formatLabel(horizon.horizonType)}
-          </div>
-          <div className="mt-1 text-3xl font-semibold text-gray-900">
-            {horizon.finalScore}
-          </div>
-        </div>
+
+
+<div>
+  <div className="text-sm font-medium text-gray-500">
+    {formatLabel(horizon.horizonType)}
+  </div>
+
+
+  <div className="mt-1 text-xs text-gray-500">Final confidence</div>
+  <div className="text-3xl font-semibold text-gray-900">
+    {horizon.finalScore}
+  </div>
+
+
+  {horizon.manualAdjustment !== 0 ? (
+
+    <div className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+
+
+<div className="font-medium text-gray-900">
+   Adjusted {horizon.manualAdjustment > 0 ? '+' : ''}
+  {horizon.manualAdjustment}
+</div>
+
+
+  </div>
+
+  ) : null}
+
+</div>
+
 
         <div
           className={`rounded-full border px-3 py-1 text-sm font-medium ${bandClasses(
@@ -217,19 +256,37 @@ function HorizonCard({
 
         <div className="rounded-lg bg-gray-50 p-3">
           <div className="text-gray-500">Manual adjustment</div>
-          <div className="font-medium text-gray-900">{horizon.manualAdjustment}</div>
+          <div className="font-medium text-gray-900">
+        	{horizon.manualAdjustment > 0 ? '+' : ''}
+   	     {horizon.manualAdjustment}
+	     </div>
         </div>
 
         <div className="rounded-lg bg-gray-50 p-3">
           <div className="text-gray-500">Status</div>
-          <div className="font-medium text-gray-900">{horizon.assessmentStatus}</div>
+
+         <div className="font-medium text-gray-900">
+           {formatAssessmentStatus(horizon.assessmentStatus)}
+         </div>
+
         </div>
 
         <div className="rounded-lg bg-gray-50 p-3">
           <div className="text-gray-500">Stale</div>
-          <div className="font-medium text-gray-900">
-            {horizon.isStale ? 'Yes (not reviewed)' : 'No'}
-          </div>
+
+
+
+
+        <div
+          className={`font-medium ${
+            horizon.isStale ? 'text-amber-700' : 'text-gray-900'
+          }`}
+        >
+          {horizon.isStale ? 'Yes (not reviewed)' : 'No'}
+        </div>
+
+
+
         </div>
 
         <div className="rounded-lg bg-gray-50 p-3">

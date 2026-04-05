@@ -1,6 +1,5 @@
-
 import type { PrismaClient } from '@prisma/client';
-import { selectAuthoritativeOwnership } from './confidence-utils';
+import { deriveConfidenceBand, selectAuthoritativeOwnership } from './confidence-utils';
 import type {
   ConfidenceBand,
   ConfidenceAssessmentStatus,
@@ -62,14 +61,14 @@ export async function loadConfidenceContext(
   }));
 
   const candidateApplications = application.DispositionDecision.flatMap((decision) =>
-  decision.DecisionCandidateApplication.map((candidate) => ({
-    id: candidate.id,
-    decisionId: candidate.decisionId,
-    candidateApplicationId: candidate.candidateApplicationId ?? null,
-    fitCommentary: candidate.notes ?? null,
-    updatedAt: candidate.updatedAt,
-  })),
-);
+    decision.DecisionCandidateApplication.map((candidate) => ({
+      id: candidate.id,
+      decisionId: candidate.decisionId,
+      candidateApplicationId: candidate.candidateApplicationId ?? null,
+      fitCommentary: candidate.notes ?? null,
+      updatedAt: candidate.updatedAt,
+    })),
+  );
 
   const notes = application.Note.map((note) => ({
     id: note.id,
@@ -102,14 +101,33 @@ export async function loadConfidenceContext(
   };
 }
 
-
-
-
 export async function upsertHorizonAssessment(
   prisma: PrismaClient,
   applicationId: string,
   result: HorizonConfidenceResult,
 ): Promise<void> {
+  const existing = await prisma.confidenceAssessment.findUnique({
+    where: {
+      applicationId_horizonType: {
+        applicationId,
+        horizonType: result.horizonType,
+      },
+    },
+  });
+
+  const preservedManualAdjustment = existing?.manualAdjustment ?? 0;
+  const preservedStatus = existing?.assessmentStatus ?? result.assessmentStatus;
+  const preservedReviewerName = existing?.reviewerName ?? null;
+  const preservedReviewNotes = existing?.reviewNotes ?? null;
+  const preservedOverrideReason = existing?.overrideReason ?? null;
+  const preservedReviewedAt = existing?.reviewedAt ?? null;
+
+  const recalculatedFinalScore = Math.max(
+    0,
+    Math.min(100, result.calculatedScore + preservedManualAdjustment),
+  );
+  const recalculatedBand = deriveConfidenceBand(recalculatedFinalScore);
+
   const assessment = await prisma.confidenceAssessment.upsert({
     where: {
       applicationId_horizonType: {
@@ -135,17 +153,17 @@ export async function upsertHorizonAssessment(
     },
     update: {
       calculatedScore: result.calculatedScore,
-      manualAdjustment: result.manualAdjustment,
-      finalScore: result.finalScore,
-      confidenceBand: result.confidenceBand,
+      manualAdjustment: preservedManualAdjustment,
+      finalScore: recalculatedFinalScore,
+      confidenceBand: recalculatedBand,
       scoringModelVersion: result.scoringModelVersion,
-      assessmentStatus: result.assessmentStatus,
-      reviewerName: result.reviewerName,
-      reviewNotes: result.reviewNotes,
-      overrideReason: result.overrideReason,
+      assessmentStatus: preservedStatus,
+      reviewerName: preservedReviewerName,
+      reviewNotes: preservedReviewNotes,
+      overrideReason: preservedOverrideReason,
       isStale: result.isStale,
       calculatedAt: result.calculatedAt,
-      reviewedAt: result.reviewedAt,
+      reviewedAt: preservedReviewedAt,
     },
   });
 
@@ -220,10 +238,3 @@ export async function updateConfidenceAssessmentReview(
     },
   });
 }
-
-
-
-
-
-
-
