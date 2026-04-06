@@ -4,6 +4,9 @@ import type { 	ApplicationListFilters,
 	    } from "./types";
 import type { DispositionType } from "@prisma/client";
 
+
+
+
 export function parseApplicationFilters(
   searchParams: Record<string, string | string[] | undefined>
 ): ApplicationListFilters {
@@ -24,29 +27,57 @@ export function parseApplicationFilters(
     ? (rawTargetDisposition as DispositionType)
     : undefined;
 
+  const staleOnly =
+    getSingleValue(searchParams.staleOnly) === "true";
+
+  const needsReviewOnly =
+    getSingleValue(searchParams.needsReviewOnly) === "true";
+
+  const overriddenOnly =
+    getSingleValue(searchParams.overriddenOnly) === "true";
+
+  const lowConfidenceOnly =
+    getSingleValue(searchParams.lowConfidenceOnly) === "true";
+
+  const hasExplicitQueueFilter =
+    searchParams.needsReviewOnly !== undefined ||
+    searchParams.overriddenOnly !== undefined ||
+    searchParams.lowConfidenceOnly !== undefined ||
+    searchParams.staleOnly !== undefined;
+
+  const effectiveNeedsReviewOnly =
+    hasExplicitQueueFilter ? needsReviewOnly : true;
+
   return {
-  search: rawSearch || undefined,
-  businessArea: rawBusinessArea || undefined,
-  targetDisposition,
+    search: rawSearch || undefined,
+    businessArea: rawBusinessArea || undefined,
+    targetDisposition,
 
-  tsaConfidenceBand:
-    typeof searchParams.tsaConfidenceBand === "string"
-      ? (searchParams.tsaConfidenceBand as ConfidenceBandFilter)
-      : undefined,
+    tsaConfidenceBand:
+      typeof searchParams.tsaConfidenceBand === "string"
+        ? (searchParams.tsaConfidenceBand as ConfidenceBandFilter)
+        : undefined,
 
-  longTermConfidenceBand:
-    typeof searchParams.longTermConfidenceBand === "string"
-      ? (searchParams.longTermConfidenceBand as ConfidenceBandFilter)
-      : undefined,
+    longTermConfidenceBand:
+      typeof searchParams.longTermConfidenceBand === "string"
+        ? (searchParams.longTermConfidenceBand as ConfidenceBandFilter)
+        : undefined,
 
-  staleOnly:
-    getSingleValue(searchParams.staleOnly) === "true",
+    staleOnly,
+    needsReviewOnly: effectiveNeedsReviewOnly,
+    overriddenOnly,
+    lowConfidenceOnly,
 
-  sort,
-  page: parsePositiveInt(getSingleValue(searchParams.page), 1),
-  pageSize: parsePositiveInt(getSingleValue(searchParams.pageSize), 25, 100),
+    sort,
+    page: parsePositiveInt(getSingleValue(searchParams.page), 1),
+    pageSize: parsePositiveInt(getSingleValue(searchParams.pageSize), 25, 100),
+  };
 }
-};
+
+
+
+
+
 
 const ALLOWED_SORTS: ApplicationListSort[] = [
   "name_asc",

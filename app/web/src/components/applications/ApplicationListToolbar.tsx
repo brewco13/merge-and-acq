@@ -78,6 +78,42 @@ export default function ApplicationListToolbar({
         Stale only
       </label>
 
+
+
+<label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+  <input
+    type="checkbox"
+    name="needsReviewOnly"
+    value="true"
+    defaultChecked={filters.needsReviewOnly ?? false}
+  />
+  Needs Review
+</label>
+
+<label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+  <input
+    type="checkbox"
+    name="overriddenOnly"
+    value="true"
+    defaultChecked={filters.overriddenOnly ?? false}
+  />
+  Overridden
+</label>
+
+<label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+  <input
+    type="checkbox"
+    name="lowConfidenceOnly"
+    value="true"
+    defaultChecked={filters.lowConfidenceOnly ?? false}
+  />
+  Low Confidence
+</label>
+
+
+
+
+
       <button type="submit">Apply</button>
       <Link href="/applications">Clear</Link>
     </form>

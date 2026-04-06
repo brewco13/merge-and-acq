@@ -76,6 +76,37 @@ export function buildApplicationWhere(
     });
   }
 
+  if (filters.needsReviewOnly) {
+  and.push({
+    ConfidenceAssessment: {
+      some: {
+        assessmentStatus: "SYSTEM_CALCULATED",
+      },
+    },
+  });
+}
+
+if (filters.overriddenOnly) {
+  and.push({
+    ConfidenceAssessment: {
+      some: {
+        manualAdjustment: {
+          not: 0,
+        },
+      },
+    },
+  });
+}
+
+if (filters.lowConfidenceOnly) {
+  and.push({
+    ConfidenceAssessment: {
+      some: {
+        confidenceBand: "LOW",
+      },
+    },
+  });
+}
   return and.length > 0 ? { AND: and } : {};
 }
 
@@ -138,17 +169,22 @@ function mapApplicationRow(row: {
     targetDisposition: DispositionType | null;
     updatedAt: Date;
   }>;
-  ConfidenceAssessment: Array<{
-    horizonType: "TSA" | "LONG_TERM";
-    finalScore: number;
-    confidenceBand: "LOW" | "MEDIUM" | "HIGH";
-    isStale: boolean;
-    ConfidenceFactorScore: Array< {
-	    factorCode: string;
-	    weightedScore: Prisma.Decimal;
-	    explanation: string | null;
-    }>;
+
+ConfidenceAssessment: Array<{
+  horizonType: "TSA" | "LONG_TERM";
+  finalScore: number;
+  confidenceBand: "LOW" | "MEDIUM" | "HIGH";
+  isStale: boolean;
+  assessmentStatus: "SYSTEM_CALCULATED" | "REVIEWED" | "APPROVED" | "OVERRIDDEN";
+  manualAdjustment: number;
+  ConfidenceFactorScore: Array<{
+    factorCode: string;
+    weightedScore: Prisma.Decimal;
+    explanation: string | null;
   }>;
+}>;
+
+
 }): ApplicationListItem {
   const latestDisposition =
     row.DispositionDecision.length > 0
@@ -260,8 +296,6 @@ export async function getApplications(
             updatedAt: true,
           },
         },
-
-
         ConfidenceAssessment: {
           select: {
             horizonType: true,

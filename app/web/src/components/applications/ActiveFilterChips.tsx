@@ -12,6 +12,11 @@ export default function ActiveFilterChips({ filters }: Props) {
   if (filters.businessArea) chips.push(`Business Area: ${filters.businessArea}`);
   if (filters.targetDisposition) chips.push(`Disposition: ${filters.targetDisposition}`);
 
+  if (filters.needsReviewOnly) chips.push("Needs Review");
+  if (filters.overriddenOnly) chips.push("Overridden");
+  if (filters.lowConfidenceOnly) chips.push("Low Confidence");
+
+
   if (chips.length === 0) {
     return null;
   }

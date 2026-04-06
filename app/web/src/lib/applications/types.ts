@@ -12,28 +12,40 @@ export type ApplicationListSort =
 
 export type ConfidenceBandFilter = "LOW" | "MEDIUM" | "HIGH";
 
- export type ApplicationListFilters = {
+
+export type ApplicationListFilters = {
   search?: string;
   businessArea?: string;
   targetDisposition?: DispositionType;
   tsaConfidenceBand?: ConfidenceBandFilter;
   longTermConfidenceBand?: ConfidenceBandFilter;
   staleOnly?: boolean;
+  needsReviewOnly?: boolean;
+  overriddenOnly?: boolean;
+  lowConfidenceOnly?: boolean;
   sort: ApplicationListSort;
   page: number;
   pageSize: number;
-};
-
-export type FilterOptionsResponse = {
-  businessAreas: string[];
-  targetDispositions: DispositionType[];
 };
 
 export type ApplicationConfidenceSummary = {
   finalScore: number;
   confidenceBand: "LOW" | "MEDIUM" | "HIGH";
   isStale: boolean;
+  assessmentStatus:
+    | "SYSTEM_CALCULATED"
+    | "REVIEWED"
+    | "APPROVED"
+    | "OVERRIDDEN";
+  manualAdjustment: number;
 } | null;
+
+
+
+export type FilterOptionsResponse = {
+  businessAreas: string[];
+  targetDispositions: DispositionType[];
+};
 
 export type ApplicationListItem = {
   id: string;
