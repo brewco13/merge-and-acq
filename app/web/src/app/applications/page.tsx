@@ -10,6 +10,8 @@ import ApplicationListToolbar from "@/components/applications/ApplicationListToo
 import ActiveFilterChips from "@/components/applications/ActiveFilterChips";
 import ApplicationTable from "@/components/applications/ApplicationTable";
 
+import type { PaginatedApplicationResults } from "@/lib/applications/types";
+
 export const dynamic = "force-dynamic";
 
 type PageProps = {
@@ -35,6 +37,51 @@ function buildPageHref(
   return `?${params.toString()}`;
 }
 
+const queueChipStyle = {
+  border: "1px solid #ddd",
+  borderRadius: 999,
+  padding: "4px 10px",
+  fontSize: 12,
+  background: "#f7f7f7",
+  cursor: "pointer",
+  display: "inline-block",
+};
+
+
+function buildQueueCounts(results: PaginatedApplicationResults) {
+//function buildQueueCounts(results: typeof results) {
+  let needsReview = 0;
+  let overridden = 0;
+  let lowConfidence = 0;
+  let stale = 0;
+
+  for (const app of results.items) {
+    const tsa = app.tsaConfidence;
+    const lt = app.longTermConfidence;
+
+    if (
+      tsa?.assessmentStatus === "SYSTEM_CALCULATED" ||
+      lt?.assessmentStatus === "SYSTEM_CALCULATED"
+    ) {
+      needsReview++;
+    }
+
+    if ((tsa?.manualAdjustment ?? 0) !== 0 || (lt?.manualAdjustment ?? 0) !== 0) {
+      overridden++;
+    }
+
+    if (tsa?.confidenceBand === "LOW" || lt?.confidenceBand === "LOW") {
+      lowConfidence++;
+    }
+
+    if (tsa?.isStale || lt?.isStale) {
+      stale++;
+    }
+  }
+  return { needsReview, overridden, lowConfidence, stale };
+}
+
+
 export default async function ApplicationsPage({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const filters = parseApplicationFilters(resolvedSearchParams);
@@ -43,6 +90,8 @@ export default async function ApplicationsPage({ searchParams }: PageProps) {
     getApplications(filters),
     getApplicationFilterOptions(),
   ]);
+
+   const queueCounts = buildQueueCounts(results);
 
   return (
 
@@ -76,6 +125,40 @@ export default async function ApplicationsPage({ searchParams }: PageProps) {
       <p style={{ marginBottom: 10 }}>
         Showing {results.total} applications
       </p>
+
+<div
+  style={{
+    marginBottom: 12,
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+  }}
+>
+     <Link href="/applications?needsReviewOnly=true">
+       <span style={queueChipStyle}>
+	 Needs Review: {queueCounts.needsReview}
+	  </span>
+     </Link>
+
+     <Link href="/applications?overriddenOnly=true">
+       <span style={queueChipStyle}>
+	 Overridden: {queueCounts.overridden}
+       </span>
+     </Link>
+
+     <Link href="/applications?lowConfidenceOnly=true">
+       <span style={queueChipStyle}>
+	 Low Confidence: {queueCounts.lowConfidence}
+       </span>
+     </Link>
+
+     <Link href="/applications?staleOnly=true">
+       <span style={queueChipStyle}>
+	 Stale: {queueCounts.stale}
+    </span>
+     </Link>
+   </div>
+
 
       <ApplicationTable results={results} />
 

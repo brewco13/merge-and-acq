@@ -15,7 +15,8 @@ export function parseApplicationFilters(
   const rawTargetDisposition = getSingleValue(searchParams.targetDisposition)?.trim();
   const rawSort = getSingleValue(searchParams.sort);
 
-  const sort: ApplicationListSort = ALLOWED_SORTS.includes(
+//  const sort: ApplicationListSort = ALLOWED_SORTS.includes(
+  let sort: ApplicationListSort = ALLOWED_SORTS.includes(
     rawSort as ApplicationListSort
   )
     ? (rawSort as ApplicationListSort)
@@ -48,6 +49,11 @@ export function parseApplicationFilters(
   const effectiveNeedsReviewOnly =
     hasExplicitQueueFilter ? needsReviewOnly : true;
 
+   if (effectiveNeedsReviewOnly && !getSingleValue(searchParams.sort)) {
+     sort = "tsaConfidence_asc";
+   }
+
+
   return {
     search: rawSearch || undefined,
     businessArea: rawBusinessArea || undefined,
@@ -74,11 +80,6 @@ export function parseApplicationFilters(
   };
 }
 
-
-
-
-
-
 const ALLOWED_SORTS: ApplicationListSort[] = [
   "name_asc",
   "name_desc",
@@ -99,10 +100,6 @@ const ALLOWED_TARGET_DISPOSITIONS: DispositionType[] = [
   "REPURCHASE",
   "CONSOLIDATE",
 ];
-
-
-
-
 
 function getSingleValue(
   value: string | string[] | undefined

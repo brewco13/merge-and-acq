@@ -9,7 +9,6 @@ type Props = {
 
 
 
-
 function renderConfidence(confidence: any) {
   if (!confidence) return <span style={{ color: "#999" }}>—</span>;
 
