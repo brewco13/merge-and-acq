@@ -1,13 +1,9 @@
-
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-
-import crypto from "node:crypto";
-
 
 type CsvRow = {
   "Business Area"?: string;
@@ -20,7 +16,9 @@ type CsvRow = {
   L2Capability?: string;
   L3Capability?: string;
   "Business Owner Sign-Off Representative"?: string;
+  "Business Owner Sign-off Acknowledgement"?: string;
   "Technical Owner Sign-Off Representative"?: string;
+  "Technical Owner Sign-off Acknowledgement"?: string;
 };
 
 type ImportMode = "validate" | "dry-run" | "upsert";
@@ -45,11 +43,14 @@ function clean(value: string | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+
 function getArgValue(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
   if (index === -1) return undefined;
   return process.argv[index + 1];
 }
+
+type ImportMode = "validate" | "dry-run" | "upsert";
 
 function getMode(): ImportMode {
   const modeArg = getArgValue("--mode");
@@ -65,6 +66,7 @@ function getMode(): ImportMode {
 }
 
 async function main() {
+
   console.log("IMPORT SCRIPT VERSION B");
 
   const fileArg = getArgValue("--file");
@@ -74,7 +76,7 @@ async function main() {
 
   if (!fileArg) {
     console.error(
-      "Usage: npx tsx scripts/import/import-applications.ts --file <path-to-csv> [--mode validate|dry-run|upsert]"
+      "Usage: npx tsx <script-path> --file <path-to-csv> [--mode validate|dry-run|upsert]"
     );
     process.exit(1);
   }
@@ -85,6 +87,13 @@ async function main() {
     console.error(`CSV file not found: ${csvPath}`);
     process.exit(1);
   }
+}
+
+
+
+
+
+
 
   const raw = fs.readFileSync(csvPath, "utf8");
 
@@ -108,7 +117,7 @@ async function main() {
   const seenLegacyIds = new Set<string>();
 
   for (const [index, row] of rows.entries()) {
-    const rowNumber = index + 2;
+    const rowNumber = index + 2; // header row is line 1
 
     const name = clean(row["Master Sheet Applications"]);
     const legacyId = clean(row["ID: LegBASF"]);
@@ -135,7 +144,7 @@ async function main() {
     if (seenLegacyIds.has(legacyId)) {
       skipped++;
       console.warn(
-        `Row ${rowNumber}: skipped - duplicate legacyId "${legacyId}" in file`
+        `Row ${rowNumber}: skipped - duplicate legacyId "${legacyId}" in input file`
       );
       continue;
     }
@@ -154,7 +163,11 @@ async function main() {
           select: { id: true },
         });
 
-        existing ? updated++ : created++;
+        if (existing) {
+          updated++;
+        } else {
+          created++;
+        }
 
         if (businessOwner || technicalOwner) {
           dryRunCount++;
@@ -169,8 +182,6 @@ async function main() {
           select: { id: true },
         });
 
-	const now = new Date();
-
         const application = await tx.application.upsert({
           where: { legacyId },
           update: {
@@ -180,23 +191,23 @@ async function main() {
             l1Capability,
             l2Capability,
             l3Capability,
-  	    updatedAt: now, 
           },
-	  create: {
-	    id: crypto.randomUUID(),
-	    legacyId,
-	    name,
-	    businessArea,
-	    description,
-	    l1Capability,
-	    l2Capability,
-	    l3Capability,
-  	    updatedAt: now,
-	  },
-
+          create: {
+            legacyId,
+            name,
+            businessArea,
+            description,
+            l1Capability,
+            l2Capability,
+            l3Capability,
+          },
         });
 
-        existing ? updated++ : created++;
+        if (existing) {
+          updated++;
+        } else {
+          created++;
+        }
 
         if (businessOwner || technicalOwner) {
           const existingOwnershipCount = await tx.ownership.count({
@@ -215,9 +226,11 @@ async function main() {
             },
           });
 
-          existingOwnershipCount > 0
-            ? ownershipUpdated++
-            : ownershipCreated++;
+          if (existingOwnershipCount > 0) {
+            ownershipUpdated++;
+          } else {
+            ownershipCreated++;
+          }
         }
       });
     } catch (error) {
@@ -249,7 +262,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
-
-
-
